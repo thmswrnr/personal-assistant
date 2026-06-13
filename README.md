@@ -77,25 +77,30 @@ Start the stack:
 docker compose up -d --build
 ```
 
-Verify the LLM is up (and see the served model id, `local-model`):
+### Easiest: the `./core.sh` launcher
+
 ```bash
-curl -s http://localhost:8080/v1/models | jq
+./core.sh                          # interactive chat (type messages; /exit or Ctrl-C to quit)
+./core.sh "summarize my notes"     # interactive, seeded with an opening message
+./core.sh -p "what is 2+2?"        # one-shot: print the answer and exit
+./core.sh skill morning-briefing   # run a skill (reliable — force-loads the full skill)
+./core.sh skill process-inbox      # process files dropped in data/storage/inbox/
 ```
+It starts the stack if needed and waits for the model to be ready before connecting.
 
-`core` stays running (`tail -f /dev/null`) so you exec into it. Talk to the agent:
+A quick end-to-end test: `./core.sh skill morning-briefing`, then drop a text file in
+`data/storage/inbox/` and run `./core.sh skill process-inbox` — it summarizes into
+`data/storage/notes/`, adds items to `todos.md`, and archives the original to `processed/`.
+
+### Under the hood (equivalent raw commands)
+
 ```bash
-# interactive
-docker exec -it core_harness pi --model local/local-model
+# does the model respond? (served id is `local-model`)
+curl -s http://localhost:8080/v1/models | jq
 
-# one-shot / scriptable
-docker exec core_harness pi -p "What files are in storage/notes?" --model local/local-model
-
-# run a skill (most reliable — see "Skills" below)
-docker exec core_harness pi -p "/skill:process-inbox" --model local/local-model
-docker exec core_harness pi -p "/skill:morning-briefing" --model local/local-model
-
-# machine-readable event stream (includes thinking_* events)
-docker exec core_harness pi -p "/skill:morning-briefing" --mode json --model local/local-model
+docker exec -it core_harness pi --model local/local-model                       # interactive
+docker exec core_harness pi -p "/skill:process-inbox" --model local/local-model # run a skill
+docker exec core_harness pi -p "hi" --mode json --model local/local-model       # JSON events (incl. thinking_*)
 ```
 
 Stop:
