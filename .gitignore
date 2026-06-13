@@ -1,0 +1,34 @@
+# Local planning / scratch docs (IDEA, PLAN, QUESTIONS_TODO)
+planning/
+
+# Secrets & environment
+.env
+
+# Claude Code local settings
+.claude/settings.local.json
+
+# OS / editor
+.DS_Store
+.vscode/
+.idea/
+*.swp
+
+# Node (if running tooling locally)
+node_modules/
+npm-debug.log*
+
+# Large model weights — keep the folder, ignore the files
+data/models/*
+!data/models/.gitkeep
+
+# User files & secrets — keep the folders, ignore the contents
+data/storage/*
+!data/storage/.gitkeep
+data/secrets/*
+!data/secrets/.gitkeep
+
+# pi config dir: TRACK config (models.json, SYSTEM.md), IGNORE runtime state
+data/memory/.pi/sessions/
+data/memory/.pi/auth.json
+data/memory/.pi/context.md
+data/memory/.pi/skills/

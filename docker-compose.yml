@@ -1,0 +1,56 @@
+services:
+  core:
+    build: 
+      context: ./core
+      dockerfile: Dockerfile
+    container_name: core_harness
+    # Run as the unprivileged "node" user (uid 1000) so files the agent creates in the
+    # mounted volumes are owned by the host user, not root.
+    user: "node"
+    volumes:
+      - ./data/memory/.pi:/app/.pi:rw
+      - ./data/storage:/app/storage:rw
+      - ./data/secrets:/app/secrets:rw
+      # pi discovers skills under its config dir; mount the tracked skills/ there
+      - ./skills:/app/.pi/skills:ro
+    env_file:
+      - .env
+    environment:
+      # Use the mounted .pi dir as pi's config dir (models.json, SYSTEM.md, skills/).
+      # The local LLM is configured as a provider in data/memory/.pi/models.json,
+      # which points at http://llm:8080/v1 (the compose service name).
+      - PI_CODING_AGENT_DIR=/app/.pi
+    networks:
+      - core_network
+    depends_on:
+      - llm
+
+  llm:
+    image: ghcr.io/ggml-org/llama.cpp:server-cuda
+    container_name: local_llm
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./data/models:/models:ro
+    environment:
+      - LLAMA_ARG_HOST=0.0.0.0
+      - LLAMA_ARG_MODEL=/models/Qwen3-14B-Q4_K_M.gguf
+      # Fixed alias so /v1/models reports a stable id that models.json can target
+      - LLAMA_ARG_ALIAS=local-model
+      # Enable Jinja chat-template + tool-call parsing (required for OpenAI tool calling)
+      - LLAMA_ARG_JINJA=1
+      - LLAMA_ARG_CTX_SIZE=8192
+      - LLAMA_ARG_N_GPU_LAYERS=-1
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    networks:
+      - core_network
+
+networks:
+  core_network:
+    driver: bridge

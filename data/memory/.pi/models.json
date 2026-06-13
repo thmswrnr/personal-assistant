@@ -1,0 +1,26 @@
+{
+  // Custom provider: the local llama.cpp server (compose service "llm").
+  // pi reaches it over the OpenAI-compatible API. "id" must match LLAMA_ARG_ALIAS.
+  "providers": {
+    "local": {
+      "baseUrl": "http://llm:8080/v1",
+      "api": "openai-completions",
+      "apiKey": "not-needed",
+      "compat": {
+        "supportsDeveloperRole": false,
+        "supportsReasoningEffort": false
+      },
+      "models": [
+        {
+          "id": "local-model",
+          "name": "Qwen3 14B (local)",
+          "reasoning": true,
+          "input": ["text"],
+          "contextWindow": 8192,
+          "maxTokens": 4096,
+          "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 }
+        }
+      ]
+    }
+  }
+}
