@@ -27,8 +27,9 @@ data/storage/*
 data/secrets/*
 !data/secrets/.gitkeep
 
-# pi config dir: TRACK config (models.json, SYSTEM.md), IGNORE runtime state
-data/memory/.pi/sessions/
-data/memory/.pi/auth.json
-data/memory/.pi/context.md
-data/memory/.pi/skills/
+# pi config dir: ignore everything pi generates at runtime (sessions, auth, settings,
+# trust, downloaded bin/, rolling context, the skills mountpoint) and track ONLY the
+# config we author. Whitelist approach, so new pi runtime files are ignored by default.
+data/memory/.pi/*
+!data/memory/.pi/models.json
+!data/memory/.pi/SYSTEM.md
