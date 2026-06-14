@@ -82,9 +82,14 @@ services:
       - LLAMA_ARG_ALIAS=local-model
       # Enable Jinja chat-template + tool-call parsing (required for OpenAI tool calling)
       - LLAMA_ARG_JINJA=1
-      # Larger context: MCP tool schemas + email content need more room than 8K.
-      # ~3.9GB KV at 24576 (unified) + ~9GB model fits the 16GB GPU with headroom.
-      - LLAMA_ARG_CTX_SIZE=24576
+      # Single-user assistant: one conversation at a time. Use ONE slot (not the default
+      # 4) so the whole KV budget goes to that conversation instead of being split/reserved
+      # for concurrent users we don't have. This lets us run a much larger per-conversation
+      # context for the same VRAM — fewer/rarer slow auto-compactions.
+      - LLAMA_ARG_N_PARALLEL=1
+      # Per-conversation context. 49152 (~2x the old 24576) fits comfortably at 1 slot and
+      # leaves vision headroom on the 16GB GPU. Keep models.json contextWindow in sync.
+      - LLAMA_ARG_CTX_SIZE=49152
       - LLAMA_ARG_N_GPU_LAYERS=-1
       # Performance: force Flash Attention (faster + less KV memory at 24K ctx).
       - LLAMA_ARG_FLASH_ATTN=on
