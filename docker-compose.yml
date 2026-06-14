@@ -13,8 +13,6 @@ services:
       - ./data/secrets:/app/secrets:rw
       # pi discovers skills under its config dir; mount the tracked skills/ there
       - ./skills:/app/.pi/skills:ro
-      # MCP bridge extension (tracked); rw so its node_modules can be installed in place
-      - ./extensions:/app/.pi/extensions:rw
     env_file:
       - .env
     environment:
@@ -52,7 +50,9 @@ services:
       - LLAMA_ARG_ALIAS=local-model
       # Enable Jinja chat-template + tool-call parsing (required for OpenAI tool calling)
       - LLAMA_ARG_JINJA=1
-      - LLAMA_ARG_CTX_SIZE=8192
+      # Larger context: MCP tool schemas + email content need more room than 8K.
+      # ~3.9GB KV at 24576 (unified) + ~9GB model fits the 16GB GPU with headroom.
+      - LLAMA_ARG_CTX_SIZE=24576
       - LLAMA_ARG_N_GPU_LAYERS=-1
     deploy:
       resources:

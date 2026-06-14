@@ -141,11 +141,13 @@ Skills are on-demand capability packages ([Agent Skills standard](https://agents
 live in `skills/` (mounted to pi's config dir at `/app/.pi/skills`) and are version-controlled.
 
 Current skills:
+- **`gmail`** — read-only Gmail access (search / read / labels) via a small Node CLI that
+  calls the official Gmail API. See "Integrating external services" below.
 - **`process-inbox`** — reads each file in `storage/inbox/`, writes a summary into
   `storage/notes/`, appends action items to `storage/todos.md`, and archives the original to
   `storage/processed/`.
-- **`morning-briefing`** — a friendly dated greeting + a joke. Placeholder until email/calendar/
-  todo integrations exist (Tier 2).
+- **`morning-briefing`** — a friendly dated greeting + a joke. Placeholder until it's wired to
+  the data sources (e.g. the `gmail` skill).
 
 > **Invoke skills with `/skill:<name>` for reliable execution**, e.g.:
 > ```bash
@@ -158,6 +160,50 @@ Current skills:
 > follow plain-language triggers more reliably.)
 
 Add your own skill by creating `skills/<name>/SKILL.md` and `docker compose restart core`.
+
+## Integrating external services
+
+This is how Core reaches the outside world (email, calendars, GitHub, …). The pattern follows
+pi's design (and OpenClaw's, the largest pi-based system): **a skill documents a capability;
+the actual work is done by a tool the agent runs via `bash`.** There's no built-in MCP.
+
+Two kinds of skills:
+- **Capability skills** wrap an external service and ship a CLI — e.g. `gmail`.
+- **Workflow skills** are just a `SKILL.md` (no script) that orchestrate capability skills and
+  built-ins — e.g. `morning-briefing`, `process-inbox`.
+
+How to add a service, by case:
+
+1. **Pure API (HTTP + JSON)** → write a small **self-contained Node CLI** in the skill folder
+   (the image already has `node` + `curl`, so **no rebuild**). The CLI holds the credential and
+   calls the official API, so the token never enters the model's context. `gmail` is this case
+   (`skills/gmail/gmail.mjs`).
+2. **A mature official CLI exists** (e.g. `gh`, `ffmpeg`) → install it in **`core/Dockerfile`**
+   (one line, pinned) and rebuild once; the `SKILL.md` just documents how to call it. The
+   Dockerfile is then the explicit, versioned, auditable list of what Core can touch.
+
+Declare dependencies in `SKILL.md` frontmatter (OpenClaw-compatible), so it's self-documenting:
+
+```yaml
+metadata:
+  { "openclaw": { "requires": { "bins": ["gh"], "env": ["GITHUB_TOKEN"] } } }
+```
+
+Credentials live in `data/secrets/` (git-ignored, mounted read-only), read by the CLI — never
+passed through the model. Prefer **read-only** scopes and least privilege.
+
+### Gmail setup (one time)
+
+The `gmail` skill needs a read-only OAuth token. Create a **Web application** OAuth client in
+Google Cloud (Gmail API enabled; redirect URI `http://localhost:4100/oauth2callback`; scope
+`gmail.readonly`), download it to `data/secrets/gmail_client_secret.json`, then run on the host:
+
+```bash
+node scripts/gmail-oauth.mjs    # opens a consent URL; approve once
+```
+
+This writes `data/secrets/gmail_oauth.json` (a read-only refresh token). After that the skill
+runs non-interactively.
 
 ## Adding or switching a model
 
