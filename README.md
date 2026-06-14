@@ -163,21 +163,32 @@ Add your own skill by creating `skills/<name>/SKILL.md` and `docker compose rest
 
 ## Scheduling
 
-The `core` container runs a **scheduler** as its main process (independent of Telegram).
-It reads `scheduler/schedule.json` (re-read live, so edits apply without a rebuild) and runs
-Core prompts at the times you set. What happens with the result is up to the prompt — save
-an email draft, write a note, or `notify` you on Telegram.
+The `core` container runs a **scheduler** as its main process — it fires recurring jobs at
+set times. It's a core capability with no dependency on anything external.
+
+**Just ask Core** — it manages the schedule via the `schedule` skill:
+
+> "Every morning at 7, run my briefing and save it as an email draft."
+> "What's scheduled?" · "Stop the hourly email job."
+
+Each job is a standard **cron** expression + a Core **prompt**, stored in
+`storage/schedule.json` (reloaded live). What happens with the result is entirely up to the
+prompt — save an email draft, append to a note, `notify` you, etc. The scheduler just runs
+the prompt; output is also logged to `docker logs core_harness`.
 
 ```json
 [
-  { "label": "Morning briefing", "at": "07:00", "prompt": "/skill:morning-briefing" },
-  { "label": "Hourly mail check", "everyMinutes": 60, "prompt": "Any important new email this hour? If so notify me; else do nothing." }
+  { "label": "Morning briefing", "cron": "0 7 * * *",
+    "prompt": "Run the morning briefing and save it as a Gmail draft to myself." },
+  { "label": "Weekday standup",  "cron": "30 8 * * 1-5",
+    "prompt": "List today's calendar events and append them to a 'standup' note." }
 ]
 ```
 
-- `at` = daily at local `HH:MM` (timezone via the `TZ` env on the `core` service, default
-  `Europe/Berlin`); `everyMinutes` = every N minutes. Empty array = nothing scheduled.
-- See `scheduler/schedule.example.json`. Output is logged to `docker logs core_harness`.
+cron = `minute hour day-of-month month day-of-week` (local time; set via the `TZ` env on
+the `core` service, default `Europe/Berlin`). E.g. `0 7 * * *` daily 07:00, `30 8 * * 1-5`
+weekdays 08:30, `0 * * * *` hourly, `*/15 * * * *` every 15 min. You can also edit
+`storage/schedule.json` by hand; see `scheduler/schedule.example.json`.
 
 ## Telegram bridge (optional)
 

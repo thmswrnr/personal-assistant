@@ -1,17 +1,17 @@
 [
   {
-    "label": "Morning briefing",
-    "at": "07:00",
-    "prompt": "/skill:morning-briefing"
-  },
-  {
     "label": "Morning briefing as an email draft",
-    "at": "06:30",
+    "cron": "0 7 * * *",
     "prompt": "Run the morning briefing, then save it as a Gmail draft to myself."
   },
   {
+    "label": "Weekday standup note",
+    "cron": "30 8 * * 1-5",
+    "prompt": "List today's calendar events and append them to a note titled 'standup'."
+  },
+  {
     "label": "Hourly important-email check",
-    "everyMinutes": 60,
-    "prompt": "Check my unread email from the last hour. If anything looks important or time-sensitive, summarize it in one or two lines; otherwise reply 'nothing important'."
+    "cron": "0 * * * *",
+    "prompt": "Check my unread email from the last hour. If anything looks important, notify me with a one-line summary; otherwise do nothing."
   }
 ]

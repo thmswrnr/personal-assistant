@@ -1,20 +1,47 @@
 #!/usr/bin/env node
 // Core's scheduler — runs as the core container's main process (keeps it alive and
-// fires scheduled jobs). Independent of Telegram: it just runs Core prompts at set
-// times; what happens with the result is up to the prompt (e.g. save an email draft,
-// write a note, or `notify` you on Telegram). `core.sh` interactive use runs alongside.
+// fires scheduled jobs). Independent of Telegram: it runs Core prompts at the scheduled
+// times; what happens with the result is up to the prompt (save an email draft, write a
+// note, `notify` you on Telegram, …). `core.sh` interactive use runs alongside.
 //
-// schedule.json is an array of jobs (re-read every tick, so edits apply live):
-//   { "label": "...", "at": "07:00", "prompt": "..." }        // daily at local HH:MM
-//   { "label": "...", "everyMinutes": 60, "prompt": "..." }    // every N minutes
-// Empty array = nothing scheduled. See schedule.example.json.
+// The schedule is storage/schedule.json — a writable data file so Core can manage it
+// (see the `schedule` skill) and it reloads live. Each job uses a standard 5-field cron
+// expression (minute hour day-of-month month day-of-week), evaluated in local time (TZ):
+//   { "label": "Morning briefing", "cron": "0 7 * * *",   "prompt": "/skill:morning-briefing" }
+//   { "label": "Weekday standup",  "cron": "30 8 * * 1-5", "prompt": "..." }
+//   { "label": "Hourly mail",      "cron": "0 * * * *",   "prompt": "..." }
 import { spawn } from "node:child_process";
 import { readFileSync } from "node:fs";
 
 const MODEL = process.env.CORE_MODEL ?? "local/local-model";
 const EXT = "/app/.pi/extensions/context-saver.mjs";
-const FILE = process.env.SCHEDULE_FILE ?? "/app/scheduler/schedule.json";
+const FILE = process.env.SCHEDULE_FILE ?? "/app/storage/schedule.json";
 const log = (...a) => console.log("[scheduler]", ...a);
+
+// --- minimal cron matcher: *, lists (a,b), ranges (a-b), steps (*/n, a-b/n) ---
+function matchField(expr, value, min, max) {
+  return String(expr).split(",").some((part) => {
+    let [range, step] = part.split("/");
+    step = step ? Number(step) : 1;
+    let lo, hi;
+    if (range === "*") { lo = min; hi = max; }
+    else if (range.includes("-")) { const [a, b] = range.split("-").map(Number); lo = a; hi = b; }
+    else { lo = hi = Number(range); }
+    if (Number.isNaN(lo) || Number.isNaN(hi) || value < lo || value > hi) return false;
+    return (value - lo) % step === 0;
+  });
+}
+function cronMatch(expr, d) {
+  const f = String(expr).trim().split(/\s+/);
+  if (f.length !== 5) return false;
+  return (
+    matchField(f[0], d.getMinutes(), 0, 59) &&
+    matchField(f[1], d.getHours(), 0, 23) &&
+    matchField(f[2], d.getDate(), 1, 31) &&
+    matchField(f[3], d.getMonth() + 1, 1, 12) &&
+    matchField(f[4], d.getDay(), 0, 6) // 0 = Sunday
+  );
+}
 
 function runAgent(prompt) {
   return new Promise((resolve) => {
@@ -49,31 +76,24 @@ function loadSchedule() {
     const j = JSON.parse(readFileSync(FILE, "utf8"));
     return Array.isArray(j) ? j : [];
   } catch {
-    return [];
+    return []; // missing/invalid file = nothing scheduled
   }
 }
 
-const lastFired = {};
-const primed = new Set();
+const lastFired = {}; // label → "YYYY-MM-DDTHH:MM" so each job fires at most once per minute
 function tick() {
   const now = new Date();
-  const hhmm = now.toTimeString().slice(0, 5); // local time (TZ env)
-  const day = now.toISOString().slice(0, 10);
+  const minute = now.toString().slice(0, 21); // coarse minute key (local)
   loadSchedule().forEach((e, i) => {
-    if (!e || !e.prompt) return;
+    if (!e || !e.prompt || !e.cron) return;
     const key = e.label || `job${i}`;
-    if (e.at) {
-      const stamp = `${day} ${e.at}`;
-      if (hhmm === e.at && lastFired[key] !== stamp) {
-        lastFired[key] = stamp;
+    try {
+      if (cronMatch(e.cron, now) && lastFired[key] !== minute) {
+        lastFired[key] = minute;
         enqueue(key, e.prompt);
       }
-    } else if (e.everyMinutes) {
-      if (!primed.has(key)) { primed.add(key); lastFired[key] = Date.now(); return; } // don't fire on startup
-      if (Date.now() - (lastFired[key] || 0) >= e.everyMinutes * 60000) {
-        lastFired[key] = Date.now();
-        enqueue(key, e.prompt);
-      }
+    } catch (err) {
+      log(`bad cron for "${key}": ${e.cron} (${err.message})`);
     }
   });
 }
