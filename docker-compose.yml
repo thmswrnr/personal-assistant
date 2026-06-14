@@ -78,6 +78,42 @@ services:
     networks:
       - core_network
 
+  llm-util:
+    # Small, fast "utility" model for context work — distilling fat prose tool output and
+    # summarizing for compaction — so those calls stay quick and don't compete with the main
+    # model. Internal-only (no host port); reached by the context-saver extension at
+    # http://llm-util:8080. Same pinned llama.cpp image; no tools/vision needed.
+    image: ghcr.io/ggml-org/llama.cpp@sha256:841b199aed2649a748875b043b32fed2e8c2d4d87e1d563556817fb7fa44b72b
+    container_name: local_llm_util
+    volumes:
+      - ./data/models:/models:ro
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 90s
+    environment:
+      - LLAMA_ARG_HOST=0.0.0.0
+      - LLAMA_ARG_MODEL=/models/Llama-3.2-3B-Instruct-Q4_K_M.gguf
+      - LLAMA_ARG_ALIAS=util-model
+      # Apply the model's chat template correctly for /v1/chat/completions.
+      - LLAMA_ARG_JINJA=1
+      # Enough to hold a fat tool output (a long page/transcript) plus prompt + summary.
+      - LLAMA_ARG_CTX_SIZE=16384
+      - LLAMA_ARG_N_GPU_LAYERS=-1
+      - LLAMA_ARG_FLASH_ATTN=on
+      - LLAMA_ARG_N_PARALLEL=1
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    networks:
+      - core_network
+
   searxng:
     # Self-hosted metasearch for the websearch skill. Internal-only (no host port) —
     # reachable by core/ui at http://searxng:8080. Pinned by digest for reproducibility.
