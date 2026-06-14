@@ -37,6 +37,7 @@ const SCOPES = [
   "https://www.googleapis.com/auth/gmail.compose", // create drafts only (never sends)
   "https://www.googleapis.com/auth/drive.readonly",
   "https://www.googleapis.com/auth/calendar.readonly",
+  "https://www.googleapis.com/auth/youtube.readonly",
 ];
 const AUTH_URI = "https://accounts.google.com/o/oauth2/v2/auth";
 const TOKEN_URI = "https://oauth2.googleapis.com/token";
