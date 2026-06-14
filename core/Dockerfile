@@ -11,6 +11,13 @@ RUN apt-get update && apt-get install -y \
 # acpx is alpha and changes frequently, so pinning here is what keeps rebuilds stable.
 RUN npm install -g @earendil-works/pi-coding-agent@0.79.1 acpx@0.10.0
 
+# yt-dlp (pinned) for the youtube skill — self-contained Linux binary, no Python/ffmpeg.
+# The skill downloads only caption tracks and cleans them to text in Node.
+ARG YT_DLP_VERSION=2026.06.09
+RUN curl -fsSL "https://github.com/yt-dlp/yt-dlp/releases/download/${YT_DLP_VERSION}/yt-dlp_linux" \
+      -o /usr/local/bin/yt-dlp \
+    && chmod a+rx /usr/local/bin/yt-dlp
+
 WORKDIR /app
 
 # The Pi harness operates in the /app directory
