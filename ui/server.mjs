@@ -98,7 +98,10 @@ async function handleChat(q, res) {
 
 // ---- panels ----
 async function panelStatus() {
-  const out = { llm: "down", model: null };
+  const out = { llm: "down", model: null, history: 0 };
+  try {
+    out.history = session.agent?.state?.messages?.length ?? 0;
+  } catch { /* ignore */ }
   try {
     const h = await fetch(`${LLM}/health`, { signal: AbortSignal.timeout(2000) });
     out.llm = h.ok ? "healthy" : "unhealthy";
@@ -106,6 +109,17 @@ async function panelStatus() {
     if (m.ok) out.model = (await m.json()).data?.[0]?.id ?? null;
   } catch { /* llm down */ }
   return out;
+}
+
+// Clear the conversation so the prompt stops growing (history bloat = slowdown).
+function resetSession() {
+  if (busy) return { ok: false, error: "busy" };
+  try {
+    session.agent.state.messages = [];
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: String(err?.message ?? err) };
+  }
 }
 async function panelTodos() {
   try {
@@ -160,6 +174,7 @@ createServer(async (req, res) => {
   const p = url.pathname;
   try {
     if (p === "/api/chat") return await handleChat(url.searchParams.get("q") ?? "", res);
+    if (p === "/api/reset") return json(res, 200, resetSession());
     if (p === "/api/status") return json(res, 200, await panelStatus());
     if (p === "/api/todos") return json(res, 200, await panelTodos());
     if (p === "/api/notes") return json(res, 200, await panelNotes());

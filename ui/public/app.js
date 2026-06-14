@@ -71,6 +71,12 @@ function ask(q) {
 $("chat").addEventListener("submit", (e) => { e.preventDefault(); ask($("q").value); });
 document.querySelectorAll(".actions button").forEach((b) =>
   b.addEventListener("click", () => ask(b.dataset.cmd)));
+$("reset").addEventListener("click", async () => {
+  if (streaming) return;
+  try { await fetch("/api/reset"); } catch {}
+  log.innerHTML = "";
+  refresh();
+});
 
 // ---- panels ----
 async function refresh() {
@@ -78,7 +84,8 @@ async function refresh() {
     const s = await (await fetch("/api/status")).json();
     const ok = s.llm === "healthy";
     $("status").innerHTML =
-      `<span class="dot ${ok ? "ok" : "bad"}"></span>${ok ? `model: ${s.model ?? "?"}` : "LLM offline"}`;
+      `<span class="dot ${ok ? "ok" : "bad"}"></span>${ok ? `model: ${s.model ?? "?"}` : "LLM offline"}` +
+      (s.history ? ` · ${s.history} msgs` : "");
   } catch { $("status").innerHTML = `<span class="dot bad"></span>offline`; }
 
   try {
