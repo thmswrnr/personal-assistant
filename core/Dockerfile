@@ -5,6 +5,7 @@ FROM node:22.22.3-slim
 RUN apt-get update && apt-get install -y \
     curl \
     git \
+    jq \
     && rm -rf /var/lib/apt/lists/*
 
 # Install the Pi Coding Agent and ACPX (headless bridge), pinned to tested versions.

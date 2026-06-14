@@ -110,29 +110,6 @@ docker compose down
 
 ---
 
-## Dashboard (web UI)
-
-A lean local web dashboard, served by a small Node service that **embeds the pi SDK**
-(`createAgentSession`) — the same agent, model, and skills as the CLI, in the browser.
-
-```bash
-docker compose up -d --build ui      # build + start (waits for the model)
-# open http://localhost:3000
-```
-
-It provides:
-- **Chat** with Core — streaming responses (and a live "🔧 tool…" indicator while skills run).
-- **Quick actions** — buttons for the `morning-briefing` and `process-inbox` skills.
-- **Live panels** — inbox file count, `todos.md`, and recent notes (auto-refresh).
-- **Status** — LLM health + loaded model.
-
-Design notes: it's a **separate `ui` container** sharing the same volumes (`.pi` config,
-`skills`, `storage`, `secrets`) and talking to `llm`. Bound to **`127.0.0.1:3000`** only
-(private, single-user). The frontend is a single static page (vanilla JS + Server-Sent
-Events) — no build step. Tune the chat's reasoning with `UI_THINKING_LEVEL`
-(`off`/`low`/`medium`/`high`, default `low`). App code (`ui/server.mjs`, `ui/public/`) is
-mounted from the repo, so edits need only `docker compose restart ui`, not a rebuild.
-
 ## Folder layout
 
 | Host path | In `core` | Purpose |

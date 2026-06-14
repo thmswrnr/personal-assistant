@@ -33,3 +33,7 @@ data/secrets/*
 data/memory/.pi/*
 !data/memory/.pi/models.json
 !data/memory/.pi/SYSTEM.md
+# Track our own extension source, but not any runtime files pi drops in extensions/
+!data/memory/.pi/extensions/
+data/memory/.pi/extensions/*
+!data/memory/.pi/extensions/context-saver.mjs

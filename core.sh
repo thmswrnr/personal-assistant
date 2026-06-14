@@ -15,6 +15,9 @@ cd "$(dirname "$0")"
 
 MODEL="local/local-model"
 CONTAINER="core_harness"
+# Context-saver extension: spills large JSON tool output to a file (the model queries it
+# with jq) to keep context lean. Auto-discovery doesn't load .mjs, so pass it explicitly.
+EXT="/app/.pi/extensions/context-saver.mjs"
 
 # Allocate a TTY only when we actually have one (so piped/non-interactive use still works).
 if [ -t 0 ] && [ -t 1 ]; then TTY=(-it); else TTY=(-i); fi
@@ -27,17 +30,17 @@ case "${1:-}" in
     shift
     [ $# -ge 1 ] || { echo "usage: ./core.sh skill <name> [args]" >&2; exit 1; }
     name="$1"; shift
-    exec docker exec "${TTY[@]}" "$CONTAINER" pi -p "/skill:${name}${*:+ $*}" --model "$MODEL"
+    exec docker exec "${TTY[@]}" "$CONTAINER" pi -e "$EXT" -p "/skill:${name}${*:+ $*}" --model "$MODEL"
     ;;
   -p|--print)
     shift
-    exec docker exec "${TTY[@]}" "$CONTAINER" pi -p "$*" --model "$MODEL"
+    exec docker exec "${TTY[@]}" "$CONTAINER" pi -e "$EXT" -p "$*" --model "$MODEL"
     ;;
   "")
-    exec docker exec "${TTY[@]}" "$CONTAINER" pi --model "$MODEL"
+    exec docker exec "${TTY[@]}" "$CONTAINER" pi -e "$EXT" --model "$MODEL"
     ;;
   *)
     # Treat the argument as an opening prompt for an interactive session.
-    exec docker exec "${TTY[@]}" "$CONTAINER" pi --model "$MODEL" "$*"
+    exec docker exec "${TTY[@]}" "$CONTAINER" pi -e "$EXT" --model "$MODEL" "$*"
     ;;
 esac
