@@ -72,11 +72,17 @@ async function enqueue(chatId, prompt) {
   while (queue.length) {
     const job = queue.shift();
     try {
-      await tg("sendChatAction", { chat_id: job.chatId, action: "typing" });
+      tg("sendChatAction", { chat_id: job.chatId, action: "typing" }).catch(() => {});
+      const t0 = process.hrtime.bigint();
       const r = await runAgent(job.prompt);
-      await send(job.chatId, r.out || (r.code === 0 ? "(no output)" : `⚠️ agent error: ${r.err || "failed"}`));
+      const secs = Number(process.hrtime.bigint() - t0) / 1e9;
+      log(`run done in ${secs.toFixed(0)}s: exit=${r.code} out=${r.out.length}ch${r.err ? ` err=${r.err.slice(0, 80)}` : ""}`);
+      const reply = r.out || (r.code === 0 ? "(no output)" : `⚠️ agent error: ${r.err || "failed"}`);
+      await send(job.chatId, reply);
+      log(`replied (${reply.length}ch)`);
     } catch (e) {
-      try { await send(job.chatId, `⚠️ ${e}`); } catch { /* ignore */ }
+      log(`job error: ${e?.message ?? e}`);
+      try { await send(job.chatId, `⚠️ ${e?.message ?? e}`); } catch { /* ignore */ }
     }
   }
   busy = false;
