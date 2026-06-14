@@ -107,6 +107,34 @@ async function cmdSearch(token, query, max) {
   };
 }
 
+function parseFlags(args) {
+  const out = {};
+  for (let i = 0; i < args.length; i++) {
+    if (args[i].startsWith("--")) out[args[i].slice(2)] = args[++i] ?? "";
+  }
+  return out;
+}
+
+// Create a DRAFT (never sends). Requires the gmail.compose scope.
+async function cmdDraft(token, { to, subject, body }) {
+  const mime = [
+    `To: ${to}`,
+    `Subject: ${subject}`,
+    'Content-Type: text/plain; charset="UTF-8"',
+    "",
+    (body ?? "").replace(/\\n/g, "\n"),
+  ].join("\r\n");
+  const raw = Buffer.from(mime, "utf8").toString("base64url");
+  const res = await fetch(`${API}/drafts`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ message: { raw } }),
+  });
+  if (!res.ok) die(`draft create failed: ${res.status} ${await res.text()}`);
+  const j = await res.json();
+  return { created: "draft", draftId: j.id, to, subject };
+}
+
 async function cmdRead(token, id) {
   const m = await api(`/messages/${id}?format=full`, token);
   const h = m.payload?.headers;
@@ -140,7 +168,13 @@ switch (cmd) {
     result = await cmdRead(token, id);
     break;
   }
+  case "draft": {
+    const f = parseFlags(rest);
+    if (!f.to || !f.subject) die('usage: gmail.mjs draft --to <addr> --subject <s> --body <text>');
+    result = await cmdDraft(token, f);
+    break;
+  }
   default:
-    die('unknown command. use: labels | search "<query>" [n] | read <messageId>');
+    die('unknown command. use: labels | search "<query>" [n] | read <messageId> | draft --to <a> --subject <s> --body <t>');
 }
 console.log(JSON.stringify(result, null, 2));

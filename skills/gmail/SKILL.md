@@ -1,6 +1,6 @@
 ---
 name: gmail
-description: Read the user's EMAIL (Gmail) — search messages, read a full message, list labels. Use for requests about email/mail, e.g. "check my email", "unread from Alice this week", "any mail from the bank?", a sender or subject. (Email — distinct from the local files inbox folder.) Read-only; cannot send, draft, or modify.
+description: Read the user's EMAIL (Gmail) and create draft replies — search, read, list labels, and save drafts. Use for email/mail requests ("check my email", "unread from Alice", "any mail from the bank?") and "draft a reply/email to…". Drafts are saved to Gmail, never sent. (Email — distinct from the local files inbox folder.)
 metadata:
   {
     "openclaw":
@@ -8,11 +8,11 @@ metadata:
   }
 ---
 
-# Gmail (read-only)
+# Gmail
 
-Read the user's Gmail via a small CLI that calls the official Gmail API. It is
-**read-only**: it can search and read mail and list labels, but cannot send,
-draft, label, or delete anything.
+Access the user's Gmail via a small CLI that calls the official Gmail API. It can
+**search**, **read**, **list labels**, and **create drafts**. It **never sends** —
+drafts are saved to Gmail for the user to review and send themselves.
 
 ## Commands (run via bash)
 
@@ -25,6 +25,9 @@ node /app/.pi/skills/gmail/gmail.mjs read <messageId>
 
 # List labels
 node /app/.pi/skills/gmail/gmail.mjs labels
+
+# Create a DRAFT (saved to Gmail, never sent — the user reviews/sends it themselves)
+node /app/.pi/skills/gmail/gmail.mjs draft --to "alice@example.com" --subject "Re: lunch" --body "Sounds good — see you at noon."
 ```
 
 Each command prints JSON. `search` returns
@@ -39,10 +42,13 @@ is capped by `maxResults`), so you can tell the user "~N total" without listing 
    `from:<boss> is:unread newer_than:1d`). Keep `maxResults` small (default 10).
 2. Run `search`, then summarize senders/subjects for the user. Only `read` a full
    message when the user wants the contents of a specific one.
-3. **Never invent email content.** If a command errors (e.g. missing credentials),
+3. To draft a reply, `read` the original first so you can quote/answer it, then
+   `draft` with a clear subject and body. Tell the user the draft is saved (not sent)
+   and they can review/send it in Gmail.
+4. **Never invent email content.** If a command errors (e.g. missing credentials),
    report that plainly rather than guessing.
 
 ## Setup (one time)
 
-Requires `data/secrets/gmail_oauth.json` (a read-only refresh token). If it's missing,
-the user runs `node scripts/gmail-oauth.mjs` on the host once to create it.
+Requires `data/secrets/gmail_oauth.json`. If it's missing, the user runs
+`node scripts/gmail-oauth.mjs` on the host once to create it.
