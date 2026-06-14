@@ -27,6 +27,34 @@ services:
       llm:
         condition: service_healthy
 
+  ui:
+    build:
+      context: ./ui
+      dockerfile: Dockerfile
+    container_name: core_ui
+    user: "node"
+    # Bind to localhost only — private, single-user dashboard.
+    ports:
+      - "127.0.0.1:3000:3000"
+    volumes:
+      # Same pi config / data / skills as core (the UI embeds the pi SDK).
+      - ./data/memory/.pi:/app/.pi:rw
+      - ./data/storage:/app/storage:rw
+      - ./data/secrets:/app/secrets:rw
+      - ./skills:/app/.pi/skills:ro
+      # App source mounted from the repo (node_modules stays from the image).
+      - ./ui/server.mjs:/app/ui/server.mjs:ro
+      - ./ui/public:/app/ui/public:ro
+    env_file:
+      - .env
+    environment:
+      - PI_CODING_AGENT_DIR=/app/.pi
+    networks:
+      - core_network
+    depends_on:
+      llm:
+        condition: service_healthy
+
   llm:
     # Pinned by digest (the working :server-cuda image) for reproducible rebuilds.
     image: ghcr.io/ggml-org/llama.cpp@sha256:841b199aed2649a748875b043b32fed2e8c2d4d87e1d563556817fb7fa44b72b
