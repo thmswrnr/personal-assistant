@@ -8,7 +8,7 @@ services:
     # mounted volumes are owned by the host user, not root.
     user: "node"
     volumes:
-      - ./data/memory/.pi:/app/.pi:rw
+      - ./data/pi:/app/.pi:rw
       - ./data/storage:/app/storage:rw
       - ./data/secrets:/app/secrets:rw
       # pi discovers skills under its config dir; mount the tracked skills/ there
@@ -19,7 +19,7 @@ services:
       - .env
     environment:
       # Use the mounted .pi dir as pi's config dir (models.json, SYSTEM.md, skills/).
-      # The local LLM is configured as a provider in data/memory/.pi/models.json,
+      # The local LLM is configured as a provider in data/pi/models.json,
       # which points at http://llm:8080/v1 (the compose service name).
       - PI_CODING_AGENT_DIR=/app/.pi
       # Local timezone so scheduled "07:00" jobs fire at local time. Change as needed.
@@ -46,7 +46,7 @@ services:
     container_name: core_bot
     user: "node"
     volumes:
-      - ./data/memory/.pi:/app/.pi:rw
+      - ./data/pi:/app/.pi:rw
       - ./data/storage:/app/storage:rw
       - ./data/secrets:/app/secrets:rw
       - ./skills:/app/.pi/skills:ro

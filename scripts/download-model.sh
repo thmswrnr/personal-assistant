@@ -9,7 +9,7 @@
 #
 # After downloading you still need to REGISTER the model (see README → "Adding or
 # switching a model"): point LLAMA_ARG_MODEL at the file in docker-compose.yml and
-# add/update the matching entry in data/memory/.pi/models.json.
+# add/update the matching entry in data/pi/models.json.
 set -euo pipefail
 
 REPO="${1:-}"
@@ -33,6 +33,6 @@ curl -L --fail -C - -o "${DEST_DIR}/${FILE}" "$URL"
 echo
 echo "Done. Next steps to register it:"
 echo "  1. docker-compose.yml  -> LLAMA_ARG_MODEL=/models/${FILE}"
-echo "  2. data/memory/.pi/models.json -> add/update a model entry (id must match"
+echo "  2. data/pi/models.json -> add/update a model entry (id must match"
 echo "     LLAMA_ARG_ALIAS; set reasoning:true for thinking models)"
 echo "  3. docker compose up -d llm && docker compose restart core"

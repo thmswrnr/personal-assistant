@@ -30,10 +30,10 @@ data/secrets/*
 # pi config dir: ignore everything pi generates at runtime (sessions, auth, settings,
 # trust, downloaded bin/, rolling context, the skills mountpoint) and track ONLY the
 # config we author. Whitelist approach, so new pi runtime files are ignored by default.
-data/memory/.pi/*
-!data/memory/.pi/models.json
-!data/memory/.pi/SYSTEM.md
+data/pi/*
+!data/pi/models.json
+!data/pi/SYSTEM.md
 # Track our own extension source, but not any runtime files pi drops in extensions/
-!data/memory/.pi/extensions/
-data/memory/.pi/extensions/*
-!data/memory/.pi/extensions/context-saver.mjs
+!data/pi/extensions/
+data/pi/extensions/*
+!data/pi/extensions/context-saver.mjs

@@ -22,7 +22,7 @@ and runs folder-driven jobs like *process my inbox* — all without your data le
 └──────────────┬──────────────┘                                 └────────────────────────┘
                │ mounted volumes
    ┌───────────┼───────────────────────────────┐
-   data/memory/.pi   data/storage   data/secrets   skills/
+   data/pi   data/storage   data/secrets   skills/
    (config+memory)   (your files)   (tokens)       (SKILL.md capabilities)
 ```
 
@@ -62,9 +62,9 @@ Optionally put cloud API keys (e.g. for switching to Gemini) in `.env`. Not need
 - **`docker-compose.yml`** — `llm` serves the GGUF with `LLAMA_ARG_ALIAS=local-model` and
   `LLAMA_ARG_JINJA=1` (tool calling); `core` runs as the `node` user with
   `PI_CODING_AGENT_DIR=/app/.pi`.
-- **`data/memory/.pi/models.json`** — registers the local server as pi provider `local`
+- **`data/pi/models.json`** — registers the local server as pi provider `local`
   (model id `local-model`, `reasoning: true`), pointing at `http://llm:8080/v1`.
-- **`data/memory/.pi/SYSTEM.md`** — Core's persona/system prompt (kept general; specific
+- **`data/pi/SYSTEM.md`** — Core's persona/system prompt (kept general; specific
   procedures live in skills). `context.md` is rolling memory the agent reads/updates.
 - **`skills/`** — mounted to `/app/.pi/skills`; see "Skills".
 
@@ -114,7 +114,7 @@ docker compose down
 
 | Host path | In `core` | Purpose |
 |---|---|---|
-| `data/memory/.pi/` | `/app/.pi` | pi config (`models.json`, `SYSTEM.md`), skills, rolling memory (`context.md`) |
+| `data/pi/` | `/app/.pi` | pi config (`models.json`, `SYSTEM.md`), skills, rolling memory (`context.md`) |
 | `data/storage/` | `/app/storage` | your files; the inbox/notes/todos live here |
 | `data/secrets/` | `/app/secrets` | API tokens / OAuth creds (git-ignored) |
 | `skills/` | `/app/.pi/skills` | `SKILL.md` capability packages (version-controlled) |
@@ -129,7 +129,7 @@ storage/
   notes/       # the second brain
 ```
 
-`data/memory/`, `data/storage/`, and `data/secrets/` contents are git-ignored (only `.gitkeep`
+`data/pi/`, `data/storage/`, `data/secrets/`, and `data/models/` contents are git-ignored (only `.gitkeep`
 is tracked) — your data stays local.
 
 ---
@@ -274,7 +274,7 @@ Then **register** it (downloading alone isn't enough — pi and the server each 
 1. **`docker-compose.yml`** (service `llm`): point at the file
    `LLAMA_ARG_MODEL=/models/<filename>`. (`LLAMA_ARG_ALIAS=local-model` keeps the served
    id stable so you rarely touch `models.json`.)
-2. **`data/memory/.pi/models.json`**: update the model entry — `id` must match
+2. **`data/pi/models.json`**: update the model entry — `id` must match
    `LLAMA_ARG_ALIAS`; set `reasoning: true` for thinking models; set `input: ["text","image"]`
    only for multimodal models; `contextWindow` should not exceed `LLAMA_ARG_CTX_SIZE`.
 3. Apply:
