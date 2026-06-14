@@ -1,6 +1,18 @@
 const $ = (id) => document.getElementById(id);
 const log = $("log");
 
+// ---- theme ----
+const theme = $("theme");
+function setTheme(t) {
+  document.documentElement.dataset.theme = t;
+  theme.textContent = t === "dark" ? "🌙" : "☀️";
+  localStorage.setItem("core-theme", t);
+}
+setTheme(localStorage.getItem("core-theme") || "dark");
+theme.addEventListener("click", () =>
+  setTheme(document.documentElement.dataset.theme === "dark" ? "light" : "dark"));
+
+// ---- chat ----
 function addMsg(cls) {
   const el = document.createElement("div");
   el.className = `msg ${cls}`;
@@ -19,14 +31,34 @@ function ask(q) {
   addMsg("user").textContent = q;
 
   const bot = addMsg("bot");
+
+  // collapsible live reasoning (hidden until thinking arrives)
+  const thinkWrap = document.createElement("details");
+  thinkWrap.className = "think-wrap";
+  thinkWrap.open = true;
+  thinkWrap.style.display = "none";
+  const sum = document.createElement("summary");
+  sum.textContent = "💭 reasoning";
+  const think = document.createElement("div");
+  think.className = "think";
+  thinkWrap.append(sum, think);
+
   const tool = document.createElement("div");
   tool.className = "tool";
-  bot.appendChild(tool);
   const text = document.createElement("span");
-  bot.appendChild(text);
+  bot.append(thinkWrap, tool, text);
 
+  let answerStarted = false;
   const es = new EventSource(`/api/chat?q=${encodeURIComponent(q)}`);
+
+  es.addEventListener("thinking", (e) => {
+    thinkWrap.style.display = "";
+    think.textContent += JSON.parse(e.data);
+    think.scrollTop = think.scrollHeight;
+    log.scrollTop = log.scrollHeight;
+  });
   es.addEventListener("text", (e) => {
+    if (!answerStarted) { answerStarted = true; thinkWrap.open = false; } // collapse once answering
     text.textContent += JSON.parse(e.data);
     log.scrollTop = log.scrollHeight;
   });
@@ -37,7 +69,11 @@ function ask(q) {
   es.addEventListener("error", (e) => {
     try { text.textContent += `\n[error: ${JSON.parse(e.data).message}]`; } catch {}
   });
-  const finish = () => { es.close(); streaming = false; $("send").disabled = false; tool.textContent = ""; refresh(); };
+  const finish = () => {
+    es.close(); streaming = false; $("send").disabled = false; tool.textContent = "";
+    if (!think.textContent) thinkWrap.remove();
+    refresh();
+  };
   es.addEventListener("done", finish);
   es.onerror = () => { if (streaming) finish(); };
 }
