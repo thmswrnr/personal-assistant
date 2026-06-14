@@ -46,12 +46,19 @@ async function send(chatId, text) {
 
 function runAgent(prompt) {
   return new Promise((resolve) => {
-    const p = spawn("pi", ["-p", prompt, "--model", MODEL, "-e", EXT], { cwd: "/app" });
-    let out = "", err = "";
+    // detached so pi leads its own process group — lets us kill the whole tree (pi + any
+    // tool subprocesses) on timeout, so a hung/runaway run can never wedge the queue.
+    const p = spawn("pi", ["-p", prompt, "--model", MODEL, "-e", EXT], { cwd: "/app", detached: true });
+    let out = "", err = "", done = false;
+    const finish = (r) => { if (done) return; done = true; clearTimeout(timer); resolve(r); };
+    const timer = setTimeout(() => {
+      try { process.kill(-p.pid, "SIGKILL"); } catch { try { p.kill("SIGKILL"); } catch { /* gone */ } }
+      finish({ code: -1, out: out.trim(), err: "timed out after 180s" });
+    }, 180000);
     p.stdout.on("data", (d) => (out += d));
     p.stderr.on("data", (d) => (err += d));
-    p.on("close", (code) => resolve({ code, out: out.trim(), err: err.trim() }));
-    p.on("error", (e) => resolve({ code: -1, out: "", err: String(e) }));
+    p.on("close", (code) => finish({ code, out: out.trim(), err: err.trim() }));
+    p.on("error", (e) => finish({ code: -1, out: "", err: String(e) }));
   });
 }
 
