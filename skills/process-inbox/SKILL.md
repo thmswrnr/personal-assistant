@@ -1,6 +1,6 @@
 ---
 name: process-inbox
-description: Process local FILES/DOCUMENTS the user dropped into the storage inbox folder — summarize each into notes, capture action items into todos, then archive the original. Use for requests about local files/documents, e.g. "process my files", "go through the documents I dropped", "process the inbox folder". (Local files — NOT email; for email use the gmail skill.)
+description: Process local FILES/DOCUMENTS/IMAGES the user dropped into the storage inbox folder — read each (including photos, screenshots, receipts, scans), summarize into notes, capture action items into todos, then archive the original. Use for requests about local files, e.g. "process my files", "go through the documents I dropped", "process the inbox folder". (Local files — NOT email; for email use the gmail skill.)
 ---
 
 # Process Inbox
@@ -19,12 +19,16 @@ inbox one file at a time and leave a clean audit trail.
 
 1. **List the inbox.** First ensure the folders exist:
    `mkdir -p /app/storage/inbox /app/storage/notes /app/storage/processed`. Then
-   `ls /app/storage/inbox/`. If it's empty, tell the user there's nothing to process and stop.
+   `ls /app/storage/inbox/`. Delete any Windows download-marker files first — names ending
+   in `Zone.Identifier` are not content (`rm /app/storage/inbox/*Zone.Identifier* 2>/dev/null`).
+   If the inbox is then empty, tell the user there's nothing to process and stop.
 2. **For each file, complete ALL FOUR sub-steps before moving to the next file.** A file is
    only finished once it has been archived (step d). Do not stop after writing the note.
-   a. **Read** it. Plain text / markdown / code: read directly. For other types, do your
-      best with the tools available and note any file you could not read (e.g. images —
-      OCR/vision is not set up yet) instead of guessing at contents.
+   a. **Read** it. Plain text / markdown / code: read directly. **Images** (photos,
+      screenshots, receipts, scans): read them too — the model can see images — and pull
+      out the useful content (e.g. a receipt → vendor, total, date; a screenshot → the
+      text/info shown). For any other binary type you genuinely cannot read, note that
+      instead of guessing — but still archive it in step d.
    b. **Summarize** it into a new note at `/app/storage/notes/<short-slug>.md` with a
       title, a 2–4 sentence summary, the original filename, and today's date (get it with
       `date +%Y-%m-%d` via bash). Keep one note per inbox item.
