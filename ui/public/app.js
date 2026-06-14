@@ -1,16 +1,6 @@
 const $ = (id) => document.getElementById(id);
 const log = $("log");
-
-// ---- theme ----
-const theme = $("theme");
-function setTheme(t) {
-  document.documentElement.dataset.theme = t;
-  theme.textContent = t === "dark" ? "🌙" : "☀️";
-  localStorage.setItem("core-theme", t);
-}
-setTheme(localStorage.getItem("core-theme") || "dark");
-theme.addEventListener("click", () =>
-  setTheme(document.documentElement.dataset.theme === "dark" ? "light" : "dark"));
+const esc = (s) => s.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
 
 // ---- chat ----
 function addMsg(cls) {
@@ -58,7 +48,7 @@ function ask(q) {
     log.scrollTop = log.scrollHeight;
   });
   es.addEventListener("text", (e) => {
-    if (!answerStarted) { answerStarted = true; thinkWrap.open = false; } // collapse once answering
+    if (!answerStarted) { answerStarted = true; thinkWrap.open = false; }
     text.textContent += JSON.parse(e.data);
     log.scrollTop = log.scrollHeight;
   });
@@ -98,13 +88,20 @@ async function refresh() {
 
   try {
     const { text } = await (await fetch("/api/todos")).json();
-    $("todos").textContent = text.trim() || "—";
+    const items = text.split("\n").map((l) => l.trim()).filter((l) => /^- \[[ xX]\]/.test(l));
+    $("todos").innerHTML = items.length
+      ? items.map((l) => {
+          const done = /^- \[[xX]\]/.test(l);
+          const label = esc(l.replace(/^- \[[ xX]\]\s*/, ""));
+          return `<div class="todo ${done ? "done" : ""}">${done ? "☑" : "☐"} ${label}</div>`;
+        }).join("")
+      : '<span class="muted">No todos.</span>';
   } catch {}
 
   try {
     const { notes } = await (await fetch("/api/notes")).json();
     $("notes").innerHTML = notes.length
-      ? notes.map((n) => `<div class="note"><b>${n.file}</b><br>${n.preview.replace(/</g, "&lt;")}</div>`).join("")
+      ? notes.map((n) => `<div class="note"><b>${esc(n.file)}</b><br>${esc(n.preview)}</div>`).join("")
       : '<span class="muted">No notes yet.</span>';
   } catch {}
 }
