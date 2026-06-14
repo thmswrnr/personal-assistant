@@ -1,6 +1,6 @@
 ---
 name: gmail
-description: Read the user's Gmail — search messages, read a full message, list labels. Use when the user asks about their email, inbox, or a specific sender/subject. Read-only (cannot send, draft, or modify).
+description: Read the user's EMAIL (Gmail) — search messages, read a full message, list labels. Use for anything about email/mail/inbox, e.g. "anything in my inbox?", "check my email", "unread from Alice", a sender or subject. (Email inbox — NOT local files.) Read-only; cannot send, draft, or modify.
 metadata:
   {
     "openclaw":

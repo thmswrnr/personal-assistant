@@ -1,6 +1,6 @@
 ---
 name: process-inbox
-description: Process files dropped in the storage inbox — read each item, file a summary into notes, capture any action items into todos, then archive the original. Use when the user says "process my inbox", "go through my inbox", or similar.
+description: Process local FILES/DOCUMENTS the user dropped into the storage inbox folder — summarize each into notes, capture action items into todos, then archive the original. Use for requests about local files/documents, e.g. "process my files", "go through the documents I dropped", "process the inbox folder". (Local files — NOT email; for email use the gmail skill.)
 ---
 
 # Process Inbox

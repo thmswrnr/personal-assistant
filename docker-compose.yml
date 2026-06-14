@@ -54,6 +54,11 @@ services:
       # ~3.9GB KV at 24576 (unified) + ~9GB model fits the 16GB GPU with headroom.
       - LLAMA_ARG_CTX_SIZE=24576
       - LLAMA_ARG_N_GPU_LAYERS=-1
+      # Performance: force Flash Attention (faster + less KV memory at 24K ctx).
+      - LLAMA_ARG_FLASH_ATTN=on
+      # Cap Qwen3 thinking: plan briefly, then act — instead of long rambling <think>
+      # traces before the obvious tool call. -1=unlimited, 0=off, N=token budget.
+      - LLAMA_ARG_THINK_BUDGET=512
     deploy:
       resources:
         reservations:
