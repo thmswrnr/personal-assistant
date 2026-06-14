@@ -1,6 +1,6 @@
 ---
 name: morning-briefing
-description: Give the user a short morning briefing — a dated greeting, a summary of recent unread email, today's calendar, and a joke. Use when the user asks for a "morning briefing", "good morning", "brief me", or similar.
+description: Give the user a short morning briefing — a dated greeting, a summary of recent unread email, today's calendar, the weather, and a joke. Use when the user asks for a "morning briefing", "good morning", "brief me", or similar.
 ---
 
 # Morning Briefing
@@ -33,7 +33,16 @@ thing brief and scannable, not a wall of text.
    - If the command errors (e.g. credentials not set up), mention it in one line and
      continue — do **not** invent events.
 
-4. **Joke.** Tell one short, clean joke.
+4. **Weather.** Run the weather CLI for the user's home city:
+   ```bash
+   node /app/.pi/skills/weather/weather.mjs "<user's city>" 1
+   ```
+   - Give a one-liner: current temp + conditions and today's high/low, and call out rain
+     if the chance is notable (e.g. "pack an umbrella").
+   - If you don't know the user's city, ask once and remember it in `context.md`; skip
+     this step gracefully if it's still unknown or the command errors.
+
+5. **Joke.** Tell one short, clean joke.
 
 ## Rules
 

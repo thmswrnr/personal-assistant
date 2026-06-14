@@ -1,0 +1,11 @@
+# SearXNG config for Core. Inherits all upstream defaults; we only override what we need.
+# The secret key comes from the SEARXNG_SECRET env var (see .env), and the bot-limiter
+# defaults off (single-user, internal-only instance) — so nothing secret lives here.
+use_default_settings: true
+
+search:
+  # Enable the JSON API so the websearch skill can query it programmatically.
+  # (Without "json" here, /search?format=json returns 403.)
+  formats:
+    - html
+    - json

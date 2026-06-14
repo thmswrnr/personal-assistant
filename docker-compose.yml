@@ -101,6 +101,21 @@ services:
     networks:
       - core_network
 
+  searxng:
+    # Self-hosted metasearch for the websearch skill. Internal-only (no host port) —
+    # reachable by core/ui at http://searxng:8080. Pinned by digest for reproducibility.
+    # No own index: it aggregates upstream engines and exposes a private JSON API.
+    image: searxng/searxng@sha256:8f1e32b1013b1e74a9b769686edbca03ff5439395743725f3f18369b4841f709
+    container_name: core_searxng
+    volumes:
+      # settings.yml enables the JSON API; the secret comes from SEARXNG_SECRET (.env).
+      - ./searxng:/etc/searxng:rw
+    environment:
+      - SEARXNG_SECRET=${SEARXNG_SECRET:?set SEARXNG_SECRET in .env (openssl rand -hex 32)}
+      - SEARXNG_BASE_URL=http://searxng:8080/
+    networks:
+      - core_network
+
 networks:
   core_network:
     driver: bridge
