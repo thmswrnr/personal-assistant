@@ -47,7 +47,9 @@ function runAgent(prompt) {
   return new Promise((resolve) => {
     // detached so we can kill the whole process tree on timeout (a hung/runaway run must
     // not block later scheduled jobs).
-    const p = spawn("pi", ["-p", prompt, "--model", MODEL, "-e", EXT], { cwd: "/app", detached: true });
+    // stdin MUST be ignored: with an open stdin pipe, `pi -p` runs but then waits on stdin
+    // forever and never exits. detached → own process group for timeout-kill.
+    const p = spawn("pi", ["-p", prompt, "--model", MODEL, "-e", EXT], { cwd: "/app", detached: true, stdio: ["ignore", "pipe", "pipe"] });
     let out = "", err = "", done = false;
     const finish = (r) => { if (done) return; done = true; clearTimeout(timer); resolve(r); };
     const timer = setTimeout(() => {
