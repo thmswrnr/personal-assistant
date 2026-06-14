@@ -59,7 +59,9 @@ const sseSend = (res, event, data) =>
   res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
 
 // ---- chat: stream one prompt's events as SSE ----
-async function handleChat(q, res) {
+// `image` (optional) is { data: <base64>, mimeType } — passed to the multimodal
+// model as a pi ImageContent attachment alongside the text prompt.
+async function handleChat(q, image, res) {
   if (busy) {
     sseInit(res);
     sseSend(res, "error", { message: "Core is busy with another request." });
@@ -85,7 +87,10 @@ async function handleChat(q, res) {
     }
   });
   try {
-    await session.prompt(q);
+    const images = image?.data
+      ? [{ type: "image", data: image.data, mimeType: image.mimeType ?? "image/png" }]
+      : undefined;
+    await session.prompt(q, images ? { images } : undefined);
     sseSend(res, "done", {});
   } catch (err) {
     sseSend(res, "error", { message: String(err?.message ?? err) });
@@ -94,6 +99,24 @@ async function handleChat(q, res) {
     busy = false;
     res.end();
   }
+}
+
+// Read and parse a JSON request body, capped so a pasted image can't exhaust memory.
+function readJsonBody(req, limit = 16 * 1024 * 1024) {
+  return new Promise((resolve, reject) => {
+    let size = 0;
+    const chunks = [];
+    req.on("data", (c) => {
+      size += c.length;
+      if (size > limit) { reject(new Error("request body too large")); req.destroy(); return; }
+      chunks.push(c);
+    });
+    req.on("end", () => {
+      try { resolve(chunks.length ? JSON.parse(Buffer.concat(chunks).toString("utf8")) : {}); }
+      catch (e) { reject(e); }
+    });
+    req.on("error", reject);
+  });
 }
 
 // ---- panels ----
@@ -173,7 +196,15 @@ createServer(async (req, res) => {
   const url = new URL(req.url, `http://localhost:${PORT}`);
   const p = url.pathname;
   try {
-    if (p === "/api/chat") return await handleChat(url.searchParams.get("q") ?? "", res);
+    if (p === "/api/chat") {
+      // POST carries an optional image attachment in the JSON body; GET (no image)
+      // is kept for simple text-only calls.
+      if (req.method === "POST") {
+        const body = await readJsonBody(req);
+        return await handleChat(body.q ?? "", body.image ?? null, res);
+      }
+      return await handleChat(url.searchParams.get("q") ?? "", null, res);
+    }
     if (p === "/api/reset") return json(res, 200, resetSession());
     if (p === "/api/status") return json(res, 200, await panelStatus());
     if (p === "/api/todos") return json(res, 200, await panelTodos());

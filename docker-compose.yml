@@ -74,6 +74,10 @@ services:
     environment:
       - LLAMA_ARG_HOST=0.0.0.0
       - LLAMA_ARG_MODEL=/models/gemma-4-12b-it-Q4_K_M.gguf
+      # Multimodal projector (Gemma 4 is encoder-free; the vision/audio tower ships
+      # separately). With this set, /props reports "vision":true and the OpenAI API
+      # accepts image_url content parts. ~175MB, offloaded to GPU alongside the model.
+      - LLAMA_ARG_MMPROJ=/models/mmproj-BF16.gguf
       # Fixed alias so /v1/models reports a stable id that models.json can target
       - LLAMA_ARG_ALIAS=local-model
       # Enable Jinja chat-template + tool-call parsing (required for OpenAI tool calling)
