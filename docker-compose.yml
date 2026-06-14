@@ -90,13 +90,12 @@ services:
       - LLAMA_ARG_ALIAS=local-model
       # Enable Jinja chat-template + tool-call parsing (required for OpenAI tool calling)
       - LLAMA_ARG_JINJA=1
-      # Single-user assistant: one conversation at a time. Use ONE slot (not the default
-      # 4) so the whole KV budget goes to that conversation instead of being split/reserved
-      # for concurrent users we don't have. This lets us run a much larger per-conversation
-      # context for the same VRAM — fewer/rarer slow auto-compactions.
-      - LLAMA_ARG_N_PARALLEL=1
-      # Per-conversation context. 49152 (~2x the old 24576) fits comfortably at 1 slot and
-      # leaves vision headroom on the 16GB GPU. Keep models.json contextWindow in sync.
+      # Core has SEVERAL concurrent agent clients sharing this server — the interactive
+      # core.sh session, the Telegram bot, and the scheduler. Give it a slot per client (3)
+      # so they don't contend/stall on a single slot (the original 1-slot setup starved them).
+      - LLAMA_ARG_N_PARALLEL=3
+      # CTX_SIZE is the TOTAL context, split across the slots: 49152 / 3 = 16384 per slot
+      # (== models.json contextWindow). Same total KV/VRAM as the old single 49152 slot.
       - LLAMA_ARG_CTX_SIZE=49152
       - LLAMA_ARG_N_GPU_LAYERS=-1
       # Performance: force Flash Attention (faster + less KV memory at 24K ctx).
