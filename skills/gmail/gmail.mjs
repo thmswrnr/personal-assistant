@@ -53,25 +53,46 @@ async function api(path, token) {
 const header = (headers, name) =>
   headers?.find((h) => h.name.toLowerCase() === name.toLowerCase())?.value ?? "";
 
-function decodeBody(payload) {
-  // Walk MIME parts for the first text/plain (fallback text/html), base64url-decoded.
-  const pick = (part) => {
-    if (!part) return "";
-    if (part.mimeType === "text/plain" && part.body?.data) return b64(part.body.data);
-    if (part.parts) {
-      for (const p of part.parts) {
-        const t = pick(p);
-        if (t) return t;
-      }
-    }
-    if (part.mimeType === "text/html" && part.body?.data) {
-      return b64(part.body.data).replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
-    }
-    return "";
-  };
-  return pick(payload);
-}
 const b64 = (data) => Buffer.from(data, "base64url").toString("utf8");
+
+// Convert HTML email to readable text — drop style/script/head, turn blocks into
+// newlines, decode common entities. (Crude tag-stripping leaves CSS/JS as "text".)
+function htmlToText(html) {
+  return html
+    .replace(/<!--[\s\S]*?-->/g, " ")
+    .replace(/<(style|script|head)\b[\s\S]*?<\/\1>/gi, " ")
+    .replace(/<\/(p|div|tr|li|h[1-6]|table)>/gi, "\n")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&").replace(/&lt;/gi, "<").replace(/&gt;/gi, ">")
+    .replace(/&quot;/gi, '"').replace(/&#39;|&apos;/gi, "'")
+    .replace(/&[a-z0-9#]+;/gi, " ");
+}
+
+// Tidy whitespace and collapse long tracking URLs so context isn't filled with junk.
+function cleanText(s) {
+  return s
+    .replace(/https?:\/\/\S{80,}/g, "(link)")
+    .replace(/[ \t]+/g, " ")
+    .split("\n").map((l) => l.trim()).join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+function decodeBody(payload) {
+  // Prefer a text/plain part; fall back to cleaned HTML.
+  let plain = "", html = "";
+  const walk = (part) => {
+    if (!part) return;
+    const data = part.body?.data;
+    if (data && part.mimeType === "text/plain" && !plain) plain = b64(data);
+    else if (data && part.mimeType === "text/html" && !html) html = b64(data);
+    (part.parts || []).forEach(walk);
+  };
+  walk(payload);
+  return cleanText(plain || (html ? htmlToText(html) : ""));
+}
 
 async function cmdLabels(token) {
   const j = await api("/labels", token);
@@ -144,7 +165,10 @@ async function cmdRead(token, id) {
     to: header(h, "To"),
     subject: header(h, "Subject"),
     date: header(h, "Date"),
-    body: decodeBody(m.payload).slice(0, 8000),
+    body: (() => {
+      const b = decodeBody(m.payload);
+      return b.length > 6000 ? b.slice(0, 6000) + "\n…[truncated]" : b;
+    })(),
   };
 }
 
