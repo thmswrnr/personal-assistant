@@ -27,7 +27,10 @@ node /app/.pi/skills/gmail/gmail.mjs read <messageId>
 node /app/.pi/skills/gmail/gmail.mjs labels
 ```
 
-Each command prints JSON. `search` returns `[{id, from, subject, date, snippet}]`;
+Each command prints JSON. `search` returns
+`{query, estimatedTotal, returned, messages: [{id, from, subject, date, snippet}]}` —
+`estimatedTotal` is the approximate number of matches (often larger than `returned`, which
+is capped by `maxResults`), so you can tell the user "~N total" without listing them all.
 `read` returns `{from, to, subject, date, body}`.
 
 ## How to use it

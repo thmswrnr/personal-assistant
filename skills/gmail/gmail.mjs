@@ -81,13 +81,13 @@ async function cmdLabels(token) {
 async function cmdSearch(token, query, max) {
   const list = await api(`/messages?q=${encodeURIComponent(query)}&maxResults=${max}`, token);
   const ids = (list.messages ?? []).map((m) => m.id);
-  const out = [];
+  const messages = [];
   for (const id of ids) {
     const m = await api(
       `/messages/${id}?format=metadata&metadataHeaders=From&metadataHeaders=Subject&metadataHeaders=Date`,
       token,
     );
-    out.push({
+    messages.push({
       id,
       from: header(m.payload?.headers, "From"),
       subject: header(m.payload?.headers, "Subject"),
@@ -95,7 +95,14 @@ async function cmdSearch(token, query, max) {
       snippet: m.snippet ?? "",
     });
   }
-  return out;
+  // resultSizeEstimate is Gmail's approximate total match count — lets callers see
+  // "N total" even though we only return (and fetch) up to `max` of them.
+  return {
+    query,
+    estimatedTotal: list.resultSizeEstimate ?? messages.length,
+    returned: messages.length,
+    messages,
+  };
 }
 
 async function cmdRead(token, id) {
