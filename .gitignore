@@ -17,6 +17,9 @@ planning/
 node_modules/
 npm-debug.log*
 
+# MCP bridge extension deps (installed in place into the mounted dir)
+extensions/**/node_modules/
+
 # Large model weights — keep the folder, ignore the files
 data/models/*
 !data/models/.gitkeep

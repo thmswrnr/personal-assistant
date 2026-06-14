@@ -13,6 +13,8 @@ services:
       - ./data/secrets:/app/secrets:rw
       # pi discovers skills under its config dir; mount the tracked skills/ there
       - ./skills:/app/.pi/skills:ro
+      # MCP bridge extension (tracked); rw so its node_modules can be installed in place
+      - ./extensions:/app/.pi/extensions:rw
     env_file:
       - .env
     environment:
