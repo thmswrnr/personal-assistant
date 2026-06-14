@@ -23,7 +23,12 @@ EXT="/app/.pi/extensions/context-saver.mjs"
 if [ -t 0 ] && [ -t 1 ]; then TTY=(-it); else TTY=(-i); fi
 
 echo "Ensuring Core is running (first start loads the model, ~30s)…" >&2
-docker compose up -d >/dev/null
+# Bring up the stack. If a Telegram token is configured, also start the optional bot
+# bridge (the `telegram` profile) so it doesn't get silently left down; without a token
+# the bridge is skipped entirely.
+PROFILES=()
+if [ -f .env ] && grep -qE '^TELEGRAM_BOT_TOKEN=.+' .env; then PROFILES=(--profile telegram); fi
+docker compose "${PROFILES[@]}" up -d >/dev/null
 
 case "${1:-}" in
   skill)
