@@ -17,10 +17,10 @@ URLs, and snippets.
 ## Command (run via bash)
 
 ```bash
-node /app/.pi/skills/websearch/search.mjs "<query>" [maxResults] [--category news]
+node /app/.pi/skills/websearch/websearch.mjs "<query>" [maxResults] [--category news]
 # e.g.
-node /app/.pi/skills/websearch/search.mjs "best local LLM june 2026" 8
-node /app/.pi/skills/websearch/search.mjs "ECB interest rate decision" 5 --category news
+node /app/.pi/skills/websearch/websearch.mjs "best local LLM june 2026" 8
+node /app/.pi/skills/websearch/websearch.mjs "ECB interest rate decision" 5 --category news
 ```
 
 It prints JSON: `{query, returned, answers, results:[{title, url, snippet, engine}]}`.
