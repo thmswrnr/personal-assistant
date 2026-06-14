@@ -13,7 +13,7 @@
       "models": [
         {
           "id": "local-model",
-          "name": "Qwen3 14B (local)",
+          "name": "Gemma 4 12B (local)",
           "reasoning": true,
           "input": ["text"],
           "contextWindow": 24576,
