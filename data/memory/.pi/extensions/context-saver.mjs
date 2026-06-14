@@ -88,11 +88,13 @@ async function utilComplete(messages, maxTokens, signal) {
 }
 
 const DISTILL_SYS =
-  "You are a context distiller for an AI assistant. From the CONTENT, keep only what is " +
-  "relevant to the user's request. Preserve specific facts, numbers, names, dates, quotes, " +
-  "and URLs verbatim. Drop navigation, menus, ads, cookie/legal notices, and boilerplate. " +
-  "Be faithful — never invent. Output the distilled content concisely; if nothing is " +
-  "relevant, say so in one line.";
+  "You extract the relevant parts of CONTENT for another AI assistant to use. Keep what is " +
+  "relevant to the user's request; preserve specific facts, numbers, names, dates, quotes, and " +
+  "URLs verbatim; drop navigation, menus, ads, cookie/legal notices, and boilerplate. Be " +
+  "faithful — never invent. " +
+  "Output ONLY the extracted content itself: no preamble, no meta-commentary, no 'Here is a " +
+  "summary', and do not address the user — begin directly with the content. If nothing is " +
+  "relevant, output exactly: (no relevant content).";
 
 async function distill(content, ctx, signal) {
   const task = lastUserText(ctx);
@@ -128,7 +130,8 @@ export default function (pi) {
         const distilled = await distill(parsed[dom.key], ctx, ctx.signal);
         if (!distilled) return; // util down → leave inline (still summarizable)
         const path = spill(event.toolCallId, text, "json");
-        const slim = { ...parsed, [dom.key]: `${distilled}\n…[distilled to save context; full ${dom.key} via: jq -r '.${dom.key}' ${path}]` };
+        const marker = `[Condensed extract of '${dom.key}' (${dom.len} chars), faithful to the source — to read the verbatim full text run: jq -r '.${dom.key}' ${path}]`;
+        const slim = { ...parsed, [dom.key]: `${marker}\n\n${distilled}` };
         return { content: [{ type: "text", text: JSON.stringify(slim, null, 2) }] };
       }
       // Otherwise list-like/structured → spill + jq.
@@ -146,9 +149,8 @@ export default function (pi) {
       const distilled = await distill(text, ctx, ctx.signal);
       if (!distilled) return;
       const path = spill(event.toolCallId, text, "txt");
-      return {
-        content: [{ type: "text", text: `${distilled}\n\n[Distilled from a larger output (${text.length} chars); full text at ${path} if you need exact details.]` }],
-      };
+      const marker = `[Condensed extract of the tool output (${text.length} chars), faithful to the source — full text at ${path} if you need exact details.]`;
+      return { content: [{ type: "text", text: `${marker}\n\n${distilled}` }] };
     }
   });
 

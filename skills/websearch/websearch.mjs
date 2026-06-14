@@ -4,7 +4,7 @@
 // list of results. No third-party deps (Node built-in fetch).
 //
 // Usage:
-//   node search.mjs "<query>" [maxResults] [--category general|news|science|it]
+//   node websearch.mjs "<query>" [maxResults] [--category general|news|science|it]
 //
 // Returns candidate {title, url, snippet} — to read a page's actual content, pass a
 // url to the web-read skill (search engines only give snippets).
@@ -26,7 +26,7 @@ function parse(args) {
 
 const f = parse(process.argv.slice(2));
 const query = f._[0];
-if (!query) die('usage: search.mjs "<query>" [maxResults] [--category general|news|science|it]');
+if (!query) die('usage: websearch.mjs "<query>" [maxResults] [--category general|news|science|it]');
 const max = Math.min(parseInt(f._[1] ?? "8", 10) || 8, 15);
 
 const params = new URLSearchParams({ q: query, format: "json", safesearch: "1" });
