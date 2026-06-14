@@ -1,6 +1,6 @@
 ---
 name: morning-briefing
-description: Give the user a short morning briefing — a dated greeting, a summary of recent unread email, and a joke. Use when the user asks for a "morning briefing", "good morning", "brief me", or similar.
+description: Give the user a short morning briefing — a dated greeting, a summary of recent unread email, today's calendar, and a joke. Use when the user asks for a "morning briefing", "good morning", "brief me", or similar.
 ---
 
 # Morning Briefing
@@ -24,10 +24,16 @@ thing brief and scannable, not a wall of text.
    - If there are none, say so. If the command errors (e.g. credentials not set up),
      mention it in one line and continue — do **not** invent emails.
 
-3. **Joke.** Tell one short, clean joke.
+3. **Today's calendar.** Run the read-only Calendar CLI:
+   ```bash
+   node /app/.pi/skills/calendar/calendar.mjs today
+   ```
+   - List what's left of today as **time — title** (e.g. "10:00 Standup, 14:00 Dentist"),
+     noting all-day events separately. If nothing's left today, say the day looks clear.
+   - If the command errors (e.g. credentials not set up), mention it in one line and
+     continue — do **not** invent events.
 
-4. **Note.** One line that calendar and to-do summaries will be added here once those
-   integrations exist.
+4. **Joke.** Tell one short, clean joke.
 
 ## Rules
 

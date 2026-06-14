@@ -1,18 +1,20 @@
 #!/usr/bin/env node
-// One-time Gmail OAuth consent → stores a refresh token for the MCP bridge.
+// One-time Google OAuth consent → stores a single refresh token shared by all the
+// Google skills (Gmail, Drive, Calendar). Re-run this whenever you add a skill that
+// needs a new scope (the token must be re-consented to cover it).
 //
 // Prereqs:
-//   - data/secrets/gmail_client_secret.json  (the "Web application" OAuth client
-//     JSON downloaded from Google Cloud Console; its authorized redirect URIs
-//     must include http://localhost:4100/oauth2callback)
+//   - data/secrets/google_client_secret.json  (or the legacy gmail_client_secret.json):
+//     the "Web application" OAuth client JSON from Google Cloud Console. Its authorized
+//     redirect URIs must include http://localhost:4100/oauth2callback, and the project
+//     must have the Gmail, Drive, and Calendar APIs enabled.
 //
-// Usage (on the host):  node scripts/gmail-oauth.mjs
+// Usage (on the host):  node scripts/google-oauth.mjs
 //
-// Opens a local listener, prints a consent URL. You approve it in the browser
-// once; Google redirects back here with a code, which we exchange for a refresh
-// token written to data/secrets/gmail_oauth.json. After this, the bridge runs
-// non-interactively.
-import { readFileSync, writeFileSync } from "node:fs";
+// Opens a local listener, prints a consent URL. You approve it in the browser once;
+// Google redirects back here with a code, which we exchange for a refresh token written
+// to data/secrets/google_oauth.json. After this, all Google skills run non-interactively.
+import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { createHash, randomBytes } from "node:crypto";
 import { createServer } from "node:http";
 import { fileURLToPath } from "node:url";
@@ -20,14 +22,21 @@ import { dirname, join } from "node:path";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const SECRETS = join(ROOT, "data", "secrets");
-const CLIENT_FILE = join(SECRETS, "gmail_client_secret.json");
-const OUT_FILE = join(SECRETS, "gmail_oauth.json");
+const CLIENT_FILE = existsSync(join(SECRETS, "google_client_secret.json"))
+  ? join(SECRETS, "google_client_secret.json")
+  : join(SECRETS, "gmail_client_secret.json");
+const OUT_FILE = join(SECRETS, "google_oauth.json");
 
 const PORT = 4100;
 const REDIRECT_URI = `http://localhost:${PORT}/oauth2callback`;
-// Read-only by design — the Gmail skill only reads. No compose/send scope.
+// Least-privilege scopes for the Google skills. All read-only except gmail.compose,
+// which only lets the gmail skill save DRAFTS (it never calls send). Add a scope here
+// and re-run this script when a new skill needs it.
 const SCOPES = [
   "https://www.googleapis.com/auth/gmail.readonly",
+  "https://www.googleapis.com/auth/gmail.compose", // create drafts only (never sends)
+  "https://www.googleapis.com/auth/drive.readonly",
+  "https://www.googleapis.com/auth/calendar.readonly",
 ];
 const AUTH_URI = "https://accounts.google.com/o/oauth2/v2/auth";
 const TOKEN_URI = "https://oauth2.googleapis.com/token";
@@ -113,6 +122,9 @@ const server = createServer(async (req, res) => {
     if (!tokens.refresh_token) {
       throw new Error("no refresh_token returned (revoke prior grant or ensure prompt=consent)");
     }
+    // Record what Google ACTUALLY granted (not just what we requested) — Google
+    // silently drops scopes whose API isn't enabled or that weren't approved.
+    const granted = (tokens.scope ?? "").split(" ").filter(Boolean);
     writeFileSync(
       OUT_FILE,
       JSON.stringify(
@@ -121,6 +133,7 @@ const server = createServer(async (req, res) => {
           client_id: client.client_id,
           client_secret: client.client_secret,
           refresh_token: tokens.refresh_token,
+          scopes: granted,
         },
         null,
         2,
@@ -131,6 +144,15 @@ const server = createServer(async (req, res) => {
     );
     console.log(`\n✓ Refresh token saved to ${OUT_FILE}`);
     console.log("  (data/secrets is git-ignored; keep it private.)");
+    const missing = SCOPES.filter((s) => !granted.includes(s));
+    if (missing.length) {
+      console.warn("\n⚠  WARNING — these requested scopes were NOT granted:");
+      missing.forEach((s) => console.warn(`     - ${s}`));
+      console.warn("   Fix: enable the matching API in Google Cloud, add the scope on the OAuth");
+      console.warn("   consent screen, and tick its checkbox on the permission page. Then re-run.");
+    } else {
+      console.log("  All requested scopes granted ✓");
+    }
     server.close();
     process.exit(0);
   } catch (e) {

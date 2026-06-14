@@ -215,18 +215,27 @@ metadata:
 Credentials live in `data/secrets/` (git-ignored, mounted read-only), read by the CLI — never
 passed through the model. Prefer **read-only** scopes and least privilege.
 
-### Gmail setup (one time)
+### Google setup (one time) — Gmail, Drive, Calendar
 
-The `gmail` skill needs a read-only OAuth token. Create a **Web application** OAuth client in
-Google Cloud (Gmail API enabled; redirect URI `http://localhost:4100/oauth2callback`; scope
-`gmail.readonly`), download it to `data/secrets/gmail_client_secret.json`, then run on the host:
+The Google skills (`gmail`, `drive`, `calendar`) share one OAuth token. In Google Cloud:
+
+1. **Enable the APIs** your skills use: Gmail API, Google Drive API, Google Calendar API.
+2. Create a **Web application** OAuth client with redirect URI
+   `http://localhost:4100/oauth2callback`, and on the consent screen add the scopes:
+   `gmail.readonly`, `gmail.compose` (drafts only — never sends), `drive.readonly`,
+   `calendar.readonly`. Add yourself as a test user.
+3. Download the client JSON to `data/secrets/google_client_secret.json`
+   (the legacy name `gmail_client_secret.json` is also accepted).
+
+Then run on the host:
 
 ```bash
-node scripts/gmail-oauth.mjs    # opens a consent URL; approve once
+node scripts/google-oauth.mjs    # opens a consent URL; approve once
 ```
 
-This writes `data/secrets/gmail_oauth.json` (a read-only refresh token). After that the skill
-runs non-interactively.
+This writes `data/secrets/google_oauth.json` (one refresh token covering all the scopes
+above). After that every Google skill runs non-interactively. **Re-run this script whenever
+you add a skill that needs a new scope** — the token must be re-consented to include it.
 
 ## Adding or switching a model
 

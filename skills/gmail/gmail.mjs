@@ -10,9 +10,14 @@
 // Auth: reads the refresh token from $GMAIL_OAUTH_FILE (default
 // /app/secrets/gmail_oauth.json), mints a short-lived access token, and calls
 // the API. The token never appears in the agent's context.
-import { readFileSync } from "node:fs";
+import { readFileSync, existsSync } from "node:fs";
 
-const OAUTH_FILE = process.env.GMAIL_OAUTH_FILE ?? "/app/secrets/gmail_oauth.json";
+// Shared Google OAuth token (Gmail + Drive + Calendar). Falls back to the legacy
+// gmail-only token file so existing setups keep working until they re-consent.
+const OAUTH_FILE = process.env.GMAIL_OAUTH_FILE
+  ?? (existsSync("/app/secrets/google_oauth.json")
+    ? "/app/secrets/google_oauth.json"
+    : "/app/secrets/gmail_oauth.json");
 const API = "https://gmail.googleapis.com/gmail/v1/users/me";
 
 function die(msg) {
