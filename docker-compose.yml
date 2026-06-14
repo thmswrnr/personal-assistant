@@ -13,8 +13,8 @@ services:
       - ./data/secrets:/app/secrets:rw
       # pi discovers skills under its config dir; mount the tracked skills/ there
       - ./skills:/app/.pi/skills:ro
-      # Scheduler script + schedule config (its main process; see command: below)
-      - ./scheduler:/app/scheduler:ro
+      # Scheduler script (its main process; see command: below)
+      - ./core/scheduler:/app/scheduler:ro
     env_file:
       - .env
     environment:
@@ -50,7 +50,7 @@ services:
       - ./data/storage:/app/storage:rw
       - ./data/secrets:/app/secrets:rw
       - ./skills:/app/.pi/skills:ro
-      - ./bot/bot.mjs:/app/bot/bot.mjs:ro
+      - ./core/bot/bot.mjs:/app/bot/bot.mjs:ro
     env_file:
       - .env
     environment:

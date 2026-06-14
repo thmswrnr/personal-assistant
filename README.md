@@ -188,7 +188,7 @@ the prompt; output is also logged to `docker logs core_harness`.
 cron = `minute hour day-of-month month day-of-week` (local time; set via the `TZ` env on
 the `core` service, default `Europe/Berlin`). E.g. `0 7 * * *` daily 07:00, `30 8 * * 1-5`
 weekdays 08:30, `0 * * * *` hourly, `*/15 * * * *` every 15 min. You can also edit
-`storage/schedule.json` by hand; see `scheduler/schedule.example.json`.
+`storage/schedule.json` by hand; see `core/scheduler/schedule.example.json`.
 
 ## Telegram bridge (optional)
 
