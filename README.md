@@ -161,6 +161,38 @@ Current skills:
 
 Add your own skill by creating `skills/<name>/SKILL.md` and `docker compose restart core`.
 
+## Scheduling
+
+The `core` container runs a **scheduler** as its main process (independent of Telegram).
+It reads `scheduler/schedule.json` (re-read live, so edits apply without a rebuild) and runs
+Core prompts at the times you set. What happens with the result is up to the prompt — save
+an email draft, write a note, or `notify` you on Telegram.
+
+```json
+[
+  { "label": "Morning briefing", "at": "07:00", "prompt": "/skill:morning-briefing" },
+  { "label": "Hourly mail check", "everyMinutes": 60, "prompt": "Any important new email this hour? If so notify me; else do nothing." }
+]
+```
+
+- `at` = daily at local `HH:MM` (timezone via the `TZ` env on the `core` service, default
+  `Europe/Berlin`); `everyMinutes` = every N minutes. Empty array = nothing scheduled.
+- See `scheduler/schedule.example.json`. Output is logged to `docker logs core_harness`.
+
+## Telegram bridge (optional)
+
+Chat with Core from your phone, and let it `notify` you. **Optional** — Core and the
+scheduler run fine without it.
+
+1. Create a bot with **@BotFather**, put the token in `.env` as `TELEGRAM_BOT_TOKEN`.
+2. Start the bridge:  `docker compose --profile telegram up -d bot`
+3. Message your bot once, then `docker logs core_bot` — it prints your chat id. Put it in
+   `.env` as `TELEGRAM_CHAT_ID` and `docker compose --profile telegram up -d bot` again.
+
+Now texts to your bot run through Core and reply; the `notify` skill (and scheduled tasks)
+can message you. The bridge is **locked to your chat id** — it ignores everyone else.
+(Voice messages aren't supported yet.)
+
 ## Integrating external services
 
 This is how Core reaches the outside world (email, calendars, GitHub, …). The pattern follows

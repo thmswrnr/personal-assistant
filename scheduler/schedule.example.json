@@ -1,0 +1,17 @@
+[
+  {
+    "label": "Morning briefing",
+    "at": "07:00",
+    "prompt": "/skill:morning-briefing"
+  },
+  {
+    "label": "Morning briefing as an email draft",
+    "at": "06:30",
+    "prompt": "Run the morning briefing, then save it as a Gmail draft to myself."
+  },
+  {
+    "label": "Hourly important-email check",
+    "everyMinutes": 60,
+    "prompt": "Check my unread email from the last hour. If anything looks important or time-sensitive, summarize it in one or two lines; otherwise reply 'nothing important'."
+  }
+]

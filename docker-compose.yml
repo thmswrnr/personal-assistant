@@ -13,6 +13,8 @@ services:
       - ./data/secrets:/app/secrets:rw
       # pi discovers skills under its config dir; mount the tracked skills/ there
       - ./skills:/app/.pi/skills:ro
+      # Scheduler script + schedule config (its main process; see command: below)
+      - ./scheduler:/app/scheduler:ro
     env_file:
       - .env
     environment:
@@ -20,10 +22,44 @@ services:
       # The local LLM is configured as a provider in data/memory/.pi/models.json,
       # which points at http://llm:8080/v1 (the compose service name).
       - PI_CODING_AGENT_DIR=/app/.pi
+      # Local timezone so scheduled "07:00" jobs fire at local time. Change as needed.
+      - TZ=Europe/Berlin
+    # Run the scheduler as the main process: it keeps the container alive AND fires
+    # scheduled jobs. Interactive use (`core.sh` → docker exec pi) runs alongside it.
+    command: ["node", "/app/scheduler/scheduler.mjs"]
     networks:
       - core_network
     depends_on:
       # Wait until the model is actually loaded and serving, not just the container started.
+      llm:
+        condition: service_healthy
+
+  bot:
+    # OPTIONAL Telegram bridge — chat with Core from your phone. Core runs fine without it.
+    # Opt-in via its profile so a plain `docker compose up` (and core.sh) does NOT start it:
+    #   docker compose --profile telegram up -d bot
+    # Reuses the core image (has pi + tooling); just runs the bridge script instead.
+    profiles: ["telegram"]
+    build:
+      context: ./core
+      dockerfile: Dockerfile
+    container_name: core_bot
+    user: "node"
+    volumes:
+      - ./data/memory/.pi:/app/.pi:rw
+      - ./data/storage:/app/storage:rw
+      - ./data/secrets:/app/secrets:rw
+      - ./skills:/app/.pi/skills:ro
+      - ./bot/bot.mjs:/app/bot/bot.mjs:ro
+    env_file:
+      - .env
+    environment:
+      - PI_CODING_AGENT_DIR=/app/.pi
+      - TZ=Europe/Berlin
+    command: ["node", "/app/bot/bot.mjs"]
+    networks:
+      - core_network
+    depends_on:
       llm:
         condition: service_healthy
 
