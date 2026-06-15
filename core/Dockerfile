@@ -6,6 +6,7 @@ RUN apt-get update && apt-get install -y \
     curl \
     git \
     jq \
+    ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
 # Install the Pi Coding Agent and ACPX (headless bridge), pinned to tested versions.

@@ -11,12 +11,16 @@
 // Config (env): TELEGRAM_BOT_TOKEN (required), TELEGRAM_CHAT_ID (your chat — required to
 // reply; until set, the bot logs incoming chat ids so you can find yours).
 import { spawn } from "node:child_process";
+import { writeFileSync, readFileSync, rmSync } from "node:fs";
 
 const TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const ALLOWED = process.env.TELEGRAM_CHAT_ID ? String(process.env.TELEGRAM_CHAT_ID) : "";
 const MODEL = process.env.CORE_MODEL ?? "local/local-model";
 const EXT = "/app/.pi/extensions/context-saver.mjs";
 const API = `https://api.telegram.org/bot${TOKEN}`;
+// The local model also handles audio (the vision projector includes an audio encoder),
+// so voice notes are transcribed by the main model — no separate STT service.
+const LLM_URL = process.env.LLM_URL ?? "http://llm:8080/v1/chat/completions";
 
 const log = (...a) => console.log("[bot]", ...a);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -64,27 +68,69 @@ function runAgent(prompt) {
   });
 }
 
-// Serialize agent runs (one GPU) — queue prompts and process one at a time.
+// Transcribe a Telegram voice/audio file with the local model (its projector includes an
+// audio encoder). Download the OGG, convert to 16 kHz mono WAV via ffmpeg, send to the llm.
+async function transcribe(fileId) {
+  try {
+    const gf = await (await fetch(`${API}/getFile?file_id=${fileId}`, { signal: AbortSignal.timeout(20000) })).json();
+    const path = gf.result?.file_path;
+    if (!path) return null;
+    const dl = await fetch(`https://api.telegram.org/file/bot${TOKEN}/${path}`, { signal: AbortSignal.timeout(30000) });
+    const oga = `/tmp/v-${fileId}.oga`, wav = `/tmp/v-${fileId}.wav`;
+    writeFileSync(oga, Buffer.from(await dl.arrayBuffer()));
+    await new Promise((res, rej) => {
+      const ff = spawn("ffmpeg", ["-hide_banner", "-loglevel", "error", "-y", "-i", oga, "-ar", "16000", "-ac", "1", wav]);
+      ff.on("close", (c) => (c === 0 ? res() : rej(new Error(`ffmpeg exit ${c}`))));
+      ff.on("error", rej);
+    });
+    const b64 = readFileSync(wav).toString("base64");
+    rmSync(oga, { force: true }); rmSync(wav, { force: true });
+    const body = {
+      model: "local-model", max_tokens: 512, temperature: 0,
+      messages: [{ role: "user", content: [
+        { type: "text", text: "Transcribe the spoken audio to text. Output ONLY the exact words spoken — no preamble, no quotation marks, no commentary." },
+        { type: "input_audio", input_audio: { data: b64, format: "wav" } },
+      ] }],
+    };
+    const r = await fetch(LLM_URL, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body), signal: AbortSignal.timeout(120000) });
+    if (!r.ok) { log(`transcribe: llm ${r.status}`); return null; }
+    return (await r.json()).choices?.[0]?.message?.content?.trim() || null;
+  } catch (e) {
+    log("transcribe error:", e?.message ?? e);
+    return null;
+  }
+}
+
+// Serialize agent runs (one GPU) — queue jobs and process one at a time.
+// A job is { prompt } (text) or { voiceFileId } (a voice note to transcribe first).
 let busy = false;
 const queue = [];
-async function enqueue(chatId, prompt) {
-  queue.push({ chatId, prompt });
+async function enqueue(chatId, job) {
+  queue.push({ chatId, ...job });
   if (busy) return;
   busy = true;
   while (queue.length) {
-    const job = queue.shift();
+    const j = queue.shift();
     try {
-      tg("sendChatAction", { chat_id: job.chatId, action: "typing" }).catch(() => {});
+      let prompt = j.prompt;
+      if (j.voiceFileId) {
+        const heard = await transcribe(j.voiceFileId);
+        if (!heard) { await send(j.chatId, "🎤 Sorry — couldn't transcribe that. Try again, or send text."); continue; }
+        log(`transcribed: ${heard.slice(0, 80)}`);
+        await send(j.chatId, `🎤 “${heard}”`); // echo what was heard, then act on it
+        prompt = heard;
+      }
+      tg("sendChatAction", { chat_id: j.chatId, action: "typing" }).catch(() => {});
       const t0 = process.hrtime.bigint();
-      const r = await runAgent(job.prompt);
+      const r = await runAgent(prompt);
       const secs = Number(process.hrtime.bigint() - t0) / 1e9;
       log(`run done in ${secs.toFixed(0)}s: exit=${r.code} out=${r.out.length}ch${r.err ? ` err=${r.err.slice(0, 80)}` : ""}`);
       const reply = r.out || (r.code === 0 ? "(no output)" : `⚠️ agent error: ${r.err || "failed"}`);
-      await send(job.chatId, reply);
+      await send(j.chatId, reply);
       log(`replied (${reply.length}ch)`);
     } catch (e) {
       log(`job error: ${e?.message ?? e}`);
-      try { await send(job.chatId, `⚠️ ${e?.message ?? e}`); } catch { /* ignore */ }
+      try { await send(j.chatId, `⚠️ ${e?.message ?? e}`); } catch { /* ignore */ }
     }
   }
   busy = false;
@@ -103,8 +149,8 @@ async function poll() {
         const chatId = String(m.chat.id);
         if (!ALLOWED) { log(`message from chat ${chatId} — set TELEGRAM_CHAT_ID=${chatId} in .env, then restart the bot.`); continue; }
         if (chatId !== ALLOWED) { log(`ignoring chat ${chatId} (not the authorized chat).`); continue; }
-        if (m.voice || m.audio) { await send(chatId, "🎤 Voice messages aren't supported yet — send text for now."); continue; }
-        if (m.text) { log(`prompt: ${m.text.slice(0, 80)}`); enqueue(chatId, m.text); }
+        if (m.voice || m.audio) { log("voice message"); enqueue(chatId, { voiceFileId: (m.voice || m.audio).file_id }); continue; }
+        if (m.text) { log(`prompt: ${m.text.slice(0, 80)}`); enqueue(chatId, { prompt: m.text }); }
       }
     } catch (e) {
       log("poll error:", e.message);
