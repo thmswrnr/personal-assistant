@@ -100,11 +100,24 @@ services:
       # Total shared KV pool — one buffer (~same VRAM as a single 49152 slot, no per-slot split).
       - LLAMA_ARG_CTX_SIZE=49152
       - LLAMA_ARG_N_GPU_LAYERS=-1
-      # Performance: force Flash Attention (faster + less KV memory at 24K ctx).
+      # Performance: force Flash Attention (faster + less KV memory; prerequisite for q8_0 KV).
       - LLAMA_ARG_FLASH_ATTN=on
-      # Cap the model's thinking: bounds runaway reasoning traces while leaving ample room for
-      # genuine multi-step reasoning. -1=unlimited, 0=off, N=token budget.
-      - LLAMA_ARG_THINK_BUDGET=1024
+      # Quantize the KV cache to q8_0: ~halves KV VRAM with negligible quality loss (safe with
+      # flash attention on), freeing headroom and easing memory bandwidth.
+      - LLAMA_ARG_CACHE_TYPE_K=q8_0
+      - LLAMA_ARG_CACHE_TYPE_V=q8_0
+      # Bigger physical batch → faster prompt prefill on long inputs (briefings, images).
+      # (logical batch-size is already 2048 by default; this raises the physical ubatch.)
+      - LLAMA_ARG_UBATCH=2048
+      # Cap the model's thinking: bounds runaway reasoning traces while leaving room for genuine
+      # multi-step reasoning. Halved from 1024 → less pre-output latency every turn. -1=unlimited,
+      # 0=off, N=token budget.
+      - LLAMA_ARG_THINK_BUDGET=512
+    # pi sends NO sampling params, so the server's CLI defaults ARE the sampling. Tune for Gemma
+    # + an assistant workload: a slightly low temp for reliable tool-calls, Gemma's top_k/top_p,
+    # min_p off. (temp/top_p/min_p have no LLAMA_ARG_ env var, so they're passed as flags here;
+    # the entrypoint is llama-server, so these args append to the env-based config above.)
+    command: ["--temp", "0.7", "--top-k", "64", "--top-p", "0.95", "--min-p", "0.0"]
     deploy:
       resources:
         reservations:
