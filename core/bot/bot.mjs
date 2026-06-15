@@ -131,7 +131,7 @@ function runAgent(prompt, imagePath, handlers = {}) {
         try {
           if (ev.type === "message_start" && ev.message?.role === "assistant") handlers.onAssistantStart?.();
           else if (ev.type === "message_update" && ev.assistantMessageEvent?.type === "text_delta") handlers.onDelta?.(ev.assistantMessageEvent.delta || "");
-          else if (ev.type === "tool_execution_start") handlers.onTool?.(ev.toolName);
+          else if (ev.type === "tool_execution_start") handlers.onTool?.(ev.toolName, ev.args);
           else if (ev.type === "tool_execution_end") handlers.onToolEnd?.();
         } catch { /* a handler throwing must not break the stream */ }
       }
@@ -142,9 +142,24 @@ function runAgent(prompt, imagePath, handlers = {}) {
   });
 }
 
-// Friendly labels for the transient "🔧 …" line shown while a tool runs.
-const TOOL_LABELS = { bash: "running a command", read: "reading a file", write: "saving a file", edit: "editing a file", websearch: "searching the web" };
-const friendlyTool = (n) => TOOL_LABELS[n] || n || "working";
+// Build the transient "🔧 …" status line shown while a tool runs — capitalized and detailed
+// (which command, which file). The trailing "…" is added by the renderer, not here.
+function toolStatus(name, args = {}) {
+  const trim = (s, n = 56) => { s = String(s).replace(/\s+/g, " ").trim(); return s.length > n ? s.slice(0, n - 1) + "…" : s; };
+  const base = (p) => String(p).split("/").filter(Boolean).pop() || String(p);
+  switch (name) {
+    case "bash": {
+      const cmd = args.command || "";
+      const skill = cmd.match(/\/skills\/([^/]+)\//); // skills run via bash → name the skill
+      if (skill) return `Running the ${skill[1]} skill`;
+      return cmd ? `Running ${trim(cmd)}` : "Running a command";
+    }
+    case "read": return args.path ? `Reading ${base(args.path)}` : "Reading a file";
+    case "write": return args.path ? `Writing ${base(args.path)}` : "Saving a file";
+    case "edit": return args.path ? `Editing ${base(args.path)}` : "Editing a file";
+    default: return name ? name.charAt(0).toUpperCase() + name.slice(1) : "Working";
+  }
+}
 
 function ffmpegTo16kWav(input, output) {
   return new Promise((res, rej) => {
@@ -241,7 +256,7 @@ async function enqueue(chatId, job) {
       const r = await runAgent(prompt, imagePath, {
         onAssistantStart: () => { answer = ""; },         // show only the latest message's text
         onDelta: (d) => { answer += d; render(false); },
-        onTool: (name) => { tool = friendlyTool(name); render(true); },
+        onTool: (name, args) => { tool = toolStatus(name, args); render(true); },
         onToolEnd: () => { tool = ""; },
       });
       const secs = Number(process.hrtime.bigint() - t0) / 1e9;
