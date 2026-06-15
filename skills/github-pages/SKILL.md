@@ -19,7 +19,12 @@ Personal Access Token the user created — the token lives in `/app/secrets/gith
 ```bash
 export GH_TOKEN="$(cat /app/secrets/github_token)"
 gh api user -q .login   # prints the username; if this errors, the token is missing/invalid — tell the user
+git config --global credential.helper '!gh auth git-credential'   # so plain `git push` authenticates via gh
 ```
+
+The `credential.helper` line is **required** — without it a later `git push` fails with
+`could not read Username for 'https://github.com'` (git has no creds of its own; this routes
+them through `gh`). The token is never printed.
 
 If `/app/secrets/github_token` doesn't exist, tell the user plainly to create a GitHub PAT
 (scope `repo`) and save it there. Don't pretend you published anything.
@@ -35,9 +40,12 @@ If `/app/secrets/github_token` doesn't exist, tell the user plainly to create a 
 2. **Create the repo and push** in one step (public; Pages needs a public repo on free plans):
    ```bash
    cd /tmp/site
-   git init -q && git add -A && git -c user.email=core@local -c user.name=Core commit -qm "Initial site"
+   git init -b main -q && git add -A && git -c user.email=core@local -c user.name=Core commit -qm "Initial site"
    gh repo create "<repo-name>" --public --source=. --remote=origin --push
    ```
+   **Use `git init -b main`** — git here defaults to a `master` branch, but Pages is enabled on
+   `main` below, so they must match. Don't skip the `-b main`, or the Pages step fails with a
+   422 / "no branch named main".
 3. **Enable Pages** from the default branch root:
    ```bash
    owner="$(gh api user -q .login)"
@@ -46,10 +54,14 @@ If `/app/secrets/github_token` doesn't exist, tell the user plainly to create a 
    (If it returns 409 "already enabled", that's fine.)
 4. **Give the user the URL** — it's `https://<owner>.github.io/<repo-name>/`. Note Pages can take
    a minute to go live on first publish.
+5. **Clean up.** The site is now hosted on GitHub — remove the local scratch copy so nothing is
+   left behind: `rm -rf /tmp/site`. (Generated/working files always go in `/tmp`, never in
+   `/app/storage` — see the system rules.)
 
 ## Updating an existing site
 `cd` into its dir, edit files, then `git add -A && git commit -m … && git push`. Pages redeploys
-automatically.
+automatically. Use plain **`git push`** (the credential helper from the Auth step makes it
+authenticate) — there is **no** `gh repo push` command, don't reach for one.
 
 ## Notes
 - Keep `GH_TOKEN` inline (`$(cat …)`) — never echo the token or hard-code it.
