@@ -81,7 +81,7 @@ services:
       start_period: 180s
     environment:
       - LLAMA_ARG_HOST=0.0.0.0
-      - LLAMA_ARG_MODEL=/models/gemma-4-12b-it-Q4_K_M.gguf
+      - LLAMA_ARG_MODEL=/models/gemma-4-12b-it-Q5_K_M.gguf
       # Multimodal projector (Gemma 4 is encoder-free; the vision/audio tower ships
       # separately). With this set, /props reports "vision":true and the OpenAI API
       # accepts image_url content parts. ~175MB, offloaded to GPU alongside the model.
