@@ -37,7 +37,20 @@ RUN curl -fsSL "https://github.com/cli/cli/releases/download/v${GH_VERSION}/gh_$
 # sonoscli (built above) for the sonos skill — controls the soundbar over the LAN (UPnP, port 1400).
 COPY --from=sonosbuild /out/sonos /usr/local/bin/sonos
 
+# Browser automation for the `browser` skill: Playwright CLI (a thin bash front-end —
+# open/snapshot/click-by-ref/…) + headless Chrome. Chrome + its OS libs are the heavy part
+# (~hundreds of MB — by far the largest addition). Browsers live in a fixed, world-readable
+# path so the non-root `node` user can launch them at runtime.
+ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+RUN npm install -g @playwright/cli@0.1.14 \
+    && npx -y playwright@1.61.0 install --with-deps chrome \
+    && chmod -R a+rx /ms-playwright \
+    && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
+# The Playwright CLI writes session/snapshot scratch (.playwright-cli/) to the working dir, so
+# /app must be writable by the non-root runtime user.
+RUN chown node:node /app
 
 # The Pi harness operates in the /app directory
 # Volumes are mapped in docker-compose.yml

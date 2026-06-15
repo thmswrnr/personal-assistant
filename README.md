@@ -150,6 +150,7 @@ Skills are on-demand capability packages ([Agent Skills standard](https://agents
 | `weather` | Current conditions + forecast via Open-Meteo (no API key). |
 | `websearch` | Web search via the private SearXNG instance. |
 | `web-read` | Fetch a URL and extract its main readable text (to summarize/answer from). |
+| `browser` | Drive a fresh headless browser — open/click/fill/navigate via accessibility-ref snapshots (Playwright CLI). For interaction; sandboxed, logged-out. |
 | `notify` | Send *you* a Telegram message (hard-limited to your chat). |
 | `schedule` | Manage recurring jobs (list / add / remove cron jobs). |
 | `process-inbox` | Read each file in `inbox/` (incl. **images** via vision) → note + todos → archive. |
@@ -281,9 +282,11 @@ Adding a service, by case:
    API, so the token never enters the model's context. Most skills are this case.
 2. **A mature official CLI exists** (e.g. `gh`, `yt-dlp`, `ffmpeg`) → install it in
    **`core/Dockerfile`** (pinned) and rebuild once; the `SKILL.md` documents how to call it.
-   Already baked in: **`yt-dlp`** (youtube), **`gh`** (github-pages), **`ffmpeg`** (voice), and
+   Already baked in: **`yt-dlp`** (youtube), **`gh`** (github-pages), **`ffmpeg`** (voice),
    **`sonos`** (sonos — compiled from source in a multi-stage build, since upstream ships macOS
-   binaries only). These add little and are harmless if unused, so the image installs them all.
+   binaries only), and **`@playwright/cli` + headless Chrome** (browser). Most are tiny and
+   harmless if unused; **Chrome is the one heavy add (~hundreds of MB)** — the cost of the
+   `browser` skill. They're all installed regardless to keep setup simple.
 
 Declare dependencies in `SKILL.md` frontmatter (OpenClaw-compatible):
 ```yaml
