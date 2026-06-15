@@ -228,7 +228,11 @@ async function enqueue(chatId, job) {
       };
       const render = async (force) => {
         const now = Date.now();
-        if (!force && now - lastEdit < 1300) return; // throttle edits
+        // Throttle repaints: Telegram has no real token stream — each update is an
+        // editMessageText call and is rate-limited, so we repaint at most every ~800ms
+        // (smaller/more frequent chunks than before, still clear of 429s; a dropped edit just
+        // merges into the next repaint). True per-token streaming isn't possible here.
+        if (!force && now - lastEdit < 800) return;
         const text = view();
         if (text === lastShown) return;
         lastShown = text; lastEdit = now;
