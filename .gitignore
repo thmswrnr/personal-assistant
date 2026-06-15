@@ -37,3 +37,4 @@ data/pi/*
 !data/pi/extensions/
 data/pi/extensions/*
 !data/pi/extensions/context-saver.mjs
+!data/pi/extensions/memory.mjs

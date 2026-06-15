@@ -13,7 +13,11 @@
 // The util model is reached directly over its OpenAI-compatible endpoint (no pi-ai
 // imports, which don't resolve from an -e extension path). If it's unavailable, distill
 // and custom-compaction degrade gracefully (prose left inline / default compaction).
+//
+// It also registers the long-term MEMORY injector (see memory.mjs) — both are "context"
+// concerns and this is the one extension guaranteed loaded on every entry point.
 import { writeFileSync, mkdirSync } from "node:fs";
+import { registerMemory } from "./memory.mjs";
 
 const SPILL_DIR = "/tmp/pi-spill";
 const MIN = 4000; // chars; below this, never touch the output
@@ -109,6 +113,9 @@ async function distill(content, ctx, signal) {
 }
 
 export default function (pi) {
+  // ---- long-term memory: inject the index into every run's system prompt ----
+  registerMemory(pi);
+
   // ---- tool_result: spill list JSON, distill prose ----
   pi.on("tool_result", async (event, ctx) => {
     if (event.toolName !== "bash" || event.isError) return;
