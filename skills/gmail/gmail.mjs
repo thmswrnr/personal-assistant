@@ -7,17 +7,13 @@
 //   node gmail.mjs search "<gmail query>" [maxResults]
 //   node gmail.mjs read <messageId>
 //
-// Auth: reads the refresh token from $GMAIL_OAUTH_FILE (default
-// /app/secrets/gmail_oauth.json), mints a short-lived access token, and calls
+// Auth: reads the refresh token from $GOOGLE_OAUTH_FILE (default
+// /app/secrets/google_oauth.json), mints a short-lived access token, and calls
 // the API. The token never appears in the agent's context.
-import { readFileSync, existsSync } from "node:fs";
+import { readFileSync } from "node:fs";
 
-// Shared Google OAuth token (Gmail + Drive + Calendar). Falls back to the legacy
-// gmail-only token file so existing setups keep working until they re-consent.
-const OAUTH_FILE = process.env.GMAIL_OAUTH_FILE
-  ?? (existsSync("/app/secrets/google_oauth.json")
-    ? "/app/secrets/google_oauth.json"
-    : "/app/secrets/gmail_oauth.json");
+// Shared Google OAuth token (Gmail + Drive + Calendar + YouTube).
+const OAUTH_FILE = process.env.GOOGLE_OAUTH_FILE ?? "/app/secrets/google_oauth.json";
 const API = "https://gmail.googleapis.com/gmail/v1/users/me";
 
 function die(msg) {
@@ -30,7 +26,7 @@ async function accessToken() {
   try {
     creds = JSON.parse(readFileSync(OAUTH_FILE, "utf8"));
   } catch {
-    die(`could not read credentials at ${OAUTH_FILE} — run scripts/gmail-oauth.mjs first`);
+    die(`could not read credentials at ${OAUTH_FILE} — run scripts/google-oauth.mjs first`);
   }
   const body = new URLSearchParams({
     grant_type: "refresh_token",

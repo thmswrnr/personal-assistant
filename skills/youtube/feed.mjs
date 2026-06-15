@@ -7,12 +7,9 @@
 // Commands:
 //   node feed.mjs subscriptions          # channels the user is subscribed to
 //   node feed.mjs feed [days]            # recent uploads across subscriptions (default 7)
-import { readFileSync, existsSync } from "node:fs";
+import { readFileSync } from "node:fs";
 
-const OAUTH_FILE = process.env.GOOGLE_OAUTH_FILE
-  ?? (existsSync("/app/secrets/google_oauth.json")
-    ? "/app/secrets/google_oauth.json"
-    : "/app/secrets/gmail_oauth.json");
+const OAUTH_FILE = process.env.GOOGLE_OAUTH_FILE ?? "/app/secrets/google_oauth.json";
 const API = "https://www.googleapis.com/youtube/v3";
 
 function die(msg) {

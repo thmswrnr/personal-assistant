@@ -4,7 +4,7 @@ description: Read the user's EMAIL (Gmail) and create draft replies — search, 
 metadata:
   {
     "openclaw":
-      { "requires": { "bins": ["node"], "files": ["/app/secrets/gmail_oauth.json"] } }
+      { "requires": { "bins": ["node"], "files": ["/app/secrets/google_oauth.json"] } }
   }
 ---
 
@@ -50,5 +50,5 @@ is capped by `maxResults`), so you can tell the user "~N total" without listing 
 
 ## Setup (one time)
 
-Requires `data/secrets/gmail_oauth.json`. If it's missing, the user runs
-`node scripts/gmail-oauth.mjs` on the host once to create it.
+Requires `data/secrets/google_oauth.json` (the shared Google token — Gmail/Drive/Calendar/
+YouTube). If it's missing, the user runs `node scripts/google-oauth.mjs` on the host once.

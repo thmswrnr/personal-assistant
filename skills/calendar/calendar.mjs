@@ -10,12 +10,9 @@
 //
 // All commands use the "primary" calendar unless --calendar <id> is given.
 // Times are returned as ISO strings in the event's own timezone.
-import { readFileSync, existsSync } from "node:fs";
+import { readFileSync } from "node:fs";
 
-const OAUTH_FILE = process.env.GOOGLE_OAUTH_FILE
-  ?? (existsSync("/app/secrets/google_oauth.json")
-    ? "/app/secrets/google_oauth.json"
-    : "/app/secrets/gmail_oauth.json");
+const OAUTH_FILE = process.env.GOOGLE_OAUTH_FILE ?? "/app/secrets/google_oauth.json";
 const CAL = "https://www.googleapis.com/calendar/v3";
 
 function die(msg) {

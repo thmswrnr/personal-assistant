@@ -10,12 +10,9 @@
 //
 // Auth: reads the refresh token from the shared Google token file, mints a
 // short-lived access token, and calls the API. The token never enters the model's context.
-import { readFileSync, existsSync } from "node:fs";
+import { readFileSync } from "node:fs";
 
-const OAUTH_FILE = process.env.GOOGLE_OAUTH_FILE
-  ?? (existsSync("/app/secrets/google_oauth.json")
-    ? "/app/secrets/google_oauth.json"
-    : "/app/secrets/gmail_oauth.json");
+const OAUTH_FILE = process.env.GOOGLE_OAUTH_FILE ?? "/app/secrets/google_oauth.json";
 const DRIVE = "https://www.googleapis.com/drive/v3";
 
 function die(msg) {

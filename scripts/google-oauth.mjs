@@ -4,17 +4,17 @@
 // needs a new scope (the token must be re-consented to cover it).
 //
 // Prereqs:
-//   - data/secrets/google_client_secret.json  (or the legacy gmail_client_secret.json):
+//   - data/secrets/google_client_secret.json:
 //     the "Web application" OAuth client JSON from Google Cloud Console. Its authorized
 //     redirect URIs must include http://localhost:4100/oauth2callback, and the project
-//     must have the Gmail, Drive, and Calendar APIs enabled.
+//     must have the Gmail, Drive, Calendar, and YouTube Data APIs enabled.
 //
 // Usage (on the host):  node scripts/google-oauth.mjs
 //
 // Opens a local listener, prints a consent URL. You approve it in the browser once;
 // Google redirects back here with a code, which we exchange for a refresh token written
 // to data/secrets/google_oauth.json. After this, all Google skills run non-interactively.
-import { readFileSync, writeFileSync, existsSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { createHash, randomBytes } from "node:crypto";
 import { createServer } from "node:http";
 import { fileURLToPath } from "node:url";
@@ -22,9 +22,7 @@ import { dirname, join } from "node:path";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const SECRETS = join(ROOT, "data", "secrets");
-const CLIENT_FILE = existsSync(join(SECRETS, "google_client_secret.json"))
-  ? join(SECRETS, "google_client_secret.json")
-  : join(SECRETS, "gmail_client_secret.json");
+const CLIENT_FILE = join(SECRETS, "google_client_secret.json");
 const OUT_FILE = join(SECRETS, "google_oauth.json");
 
 const PORT = 4100;
