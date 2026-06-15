@@ -5,7 +5,7 @@
 #   scripts/download-model.sh <hf_repo> <filename>
 #
 # Example:
-#   scripts/download-model.sh Qwen/Qwen3-14B-GGUF Qwen3-14B-Q4_K_M.gguf
+#   scripts/download-model.sh unsloth/gemma-4-12b-it-GGUF gemma-4-12b-it-Q5_K_M.gguf
 #
 # After downloading you still need to REGISTER the model (see README → "Adding or
 # switching a model"): point LLAMA_ARG_MODEL at the file in docker-compose.yml and
@@ -18,7 +18,7 @@ DEST_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/data/models"
 
 if [[ -z "$REPO" || -z "$FILE" ]]; then
   echo "Usage: $0 <hf_repo> <filename>" >&2
-  echo "Example: $0 Qwen/Qwen3-14B-GGUF Qwen3-14B-Q4_K_M.gguf" >&2
+  echo "Example: $0 unsloth/gemma-4-12b-it-GGUF gemma-4-12b-it-Q5_K_M.gguf" >&2
   exit 1
 fi
 

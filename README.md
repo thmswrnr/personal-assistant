@@ -61,7 +61,7 @@ Three files go in `data/models/` (the helper script resumes interrupted download
 
 ```bash
 # main model (text + vision) + its vision projector
-scripts/download-model.sh unsloth/gemma-4-12b-it-GGUF gemma-4-12b-it-Q4_K_M.gguf
+scripts/download-model.sh unsloth/gemma-4-12b-it-GGUF gemma-4-12b-it-Q5_K_M.gguf
 scripts/download-model.sh unsloth/gemma-4-12b-it-GGUF mmproj-BF16.gguf
 # small utility model (distillation + fast compaction)
 scripts/download-model.sh bartowski/Llama-3.2-3B-Instruct-GGUF Llama-3.2-3B-Instruct-Q4_K_M.gguf

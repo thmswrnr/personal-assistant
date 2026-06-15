@@ -100,28 +100,51 @@ async function downloadTgFile(fileId, base) {
   return out;
 }
 
-// ---- agent run ----
-// Run a prompt through Core. imagePath (optional) is attached as a `@file` positional so the
-// model sees the image. stdin ignored (an open stdin pipe makes `pi -p` hang forever);
-// detached → own process group so the timeout can kill the whole tree.
-function runAgent(prompt, imagePath) {
+// ---- agent run (streaming) ----
+// Run a prompt through Core in JSON event mode and stream the assistant's answer out via
+// callbacks, so the Telegram message can update live as text arrives. We forward only
+// `text_delta` (the answer) — `thinking_delta` (reasoning) is deliberately ignored — plus
+// tool start/end so the UI can show "🔧 …". imagePath (optional) is attached as a `@file`
+// positional so the model sees the image. stdin ignored (an open stdin pipe makes pi hang
+// forever); detached → own process group so the timeout can kill the whole tree.
+function runAgent(prompt, imagePath, handlers = {}) {
   return new Promise((resolve) => {
-    const args = imagePath
-      ? ["--print", `@${imagePath}`, prompt, "--model", MODEL, "-e", EXT]
-      : ["--print", prompt, "--model", MODEL, "-e", EXT];
+    const head = ["--mode", "json"];
+    const tail = ["--model", MODEL, "-e", EXT];
+    const args = imagePath ? [...head, `@${imagePath}`, prompt, ...tail] : [...head, prompt, ...tail];
     const p = spawn("pi", args, { cwd: "/app", detached: true, stdio: ["ignore", "pipe", "pipe"] });
-    let out = "", err = "", done = false;
+    let err = "", buf = "", done = false;
     const finish = (r) => { if (done) return; done = true; clearTimeout(timer); resolve(r); };
     const timer = setTimeout(() => {
       try { process.kill(-p.pid, "SIGKILL"); } catch { try { p.kill("SIGKILL"); } catch { /* gone */ } }
-      finish({ code: -1, out: out.trim(), err: "timed out after 180s" });
+      finish({ code: -1, err: "timed out after 180s" });
     }, 180000);
-    p.stdout.on("data", (d) => (out += d));
+    p.stdout.on("data", (d) => {
+      buf += d;
+      let nl;
+      while ((nl = buf.indexOf("\n")) >= 0) {
+        const line = buf.slice(0, nl).trim();
+        buf = buf.slice(nl + 1);
+        if (!line) continue;
+        let ev;
+        try { ev = JSON.parse(line); } catch { continue; } // ignore non-JSON / partial noise
+        try {
+          if (ev.type === "message_start" && ev.message?.role === "assistant") handlers.onAssistantStart?.();
+          else if (ev.type === "message_update" && ev.assistantMessageEvent?.type === "text_delta") handlers.onDelta?.(ev.assistantMessageEvent.delta || "");
+          else if (ev.type === "tool_execution_start") handlers.onTool?.(ev.toolName);
+          else if (ev.type === "tool_execution_end") handlers.onToolEnd?.();
+        } catch { /* a handler throwing must not break the stream */ }
+      }
+    });
     p.stderr.on("data", (d) => (err += d));
-    p.on("close", (code) => finish({ code, out: out.trim(), err: err.trim() }));
-    p.on("error", (e) => finish({ code: -1, out: "", err: String(e) }));
+    p.on("close", (code) => finish({ code, err: err.trim() }));
+    p.on("error", (e) => finish({ code: -1, err: String(e) }));
   });
 }
+
+// Friendly labels for the transient "🔧 …" line shown while a tool runs.
+const TOOL_LABELS = { bash: "running a command", read: "reading a file", write: "saving a file", edit: "editing a file", websearch: "searching the web" };
+const friendlyTool = (n) => TOOL_LABELS[n] || n || "working";
 
 function ffmpegTo16kWav(input, output) {
   return new Promise((res, rej) => {
@@ -195,11 +218,32 @@ async function enqueue(chatId, job) {
         statusId = await sendMsg(j.chatId, "🤔 Working on it…");
       }
       const t0 = process.hrtime.bigint();
-      const r = await runAgent(prompt, imagePath);
+      // Live: accumulate the current assistant message's text plus a transient tool line, and
+      // edit the status message as it streams in (throttled to stay under Telegram's edit rate).
+      let answer = "", tool = "", lastShown = "", lastEdit = 0;
+      const view = () => {
+        const t = answer.trimStart();
+        const body = tool ? `${t ? t + "\n\n" : ""}🔧 ${tool}…` : t;
+        return body || "🤔 Working on it…";
+      };
+      const render = async (force) => {
+        const now = Date.now();
+        if (!force && now - lastEdit < 1300) return; // throttle edits
+        const text = view();
+        if (text === lastShown) return;
+        lastShown = text; lastEdit = now;
+        await editMsg(j.chatId, statusId, text.length > 4096 ? text.slice(0, 4090) + "…" : text);
+      };
+      const r = await runAgent(prompt, imagePath, {
+        onAssistantStart: () => { answer = ""; },         // show only the latest message's text
+        onDelta: (d) => { answer += d; render(false); },
+        onTool: (name) => { tool = friendlyTool(name); render(true); },
+        onToolEnd: () => { tool = ""; },
+      });
       const secs = Number(process.hrtime.bigint() - t0) / 1e9;
-      log(`run done in ${secs.toFixed(0)}s: exit=${r.code} out=${r.out.length}ch${r.err ? ` err=${r.err.slice(0, 80)}` : ""}`);
-      const reply = r.out || (r.code === 0 ? "(no output)" : `⚠️ agent error: ${r.err || "failed"}`);
-      await editOrSend(j.chatId, statusId, reply);
+      const reply = answer.trim() || (r.code === 0 ? "(no output)" : `⚠️ agent error: ${r.err || "failed"}`);
+      log(`run done in ${secs.toFixed(0)}s: exit=${r.code} out=${reply.length}ch${r.err ? ` err=${r.err.slice(0, 80)}` : ""}`);
+      await editOrSend(j.chatId, statusId, reply); // final, clean answer (handles >4096 chunking)
       log(`replied (${reply.length}ch)`);
     } catch (e) {
       log(`job error: ${e?.message ?? e}`);
