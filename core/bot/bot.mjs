@@ -74,27 +74,37 @@ async function transcribe(fileId) {
   try {
     const gf = await (await fetch(`${API}/getFile?file_id=${fileId}`, { signal: AbortSignal.timeout(20000) })).json();
     const path = gf.result?.file_path;
+    log(`transcribe: getFile path=${path || "NONE"}${gf.ok === false ? ` (${gf.description})` : ""}`);
     if (!path) return null;
     const dl = await fetch(`https://api.telegram.org/file/bot${TOKEN}/${path}`, { signal: AbortSignal.timeout(30000) });
-    const oga = `/tmp/v-${fileId}.oga`, wav = `/tmp/v-${fileId}.wav`;
+    const oga = `/tmp/v-${Date.now()}.oga`, wav = oga.replace(".oga", ".wav");
     writeFileSync(oga, Buffer.from(await dl.arrayBuffer()));
+    log(`transcribe: downloaded ${readFileSync(oga).length}b -> ${oga}`);
     await new Promise((res, rej) => {
       const ff = spawn("ffmpeg", ["-hide_banner", "-loglevel", "error", "-y", "-i", oga, "-ar", "16000", "-ac", "1", wav]);
-      ff.on("close", (c) => (c === 0 ? res() : rej(new Error(`ffmpeg exit ${c}`))));
+      let fe = "";
+      ff.stderr.on("data", (d) => (fe += d));
+      ff.on("close", (c) => (c === 0 ? res() : rej(new Error(`ffmpeg exit ${c}: ${fe.slice(0, 200)}`))));
       ff.on("error", rej);
     });
     const b64 = readFileSync(wav).toString("base64");
+    log(`transcribe: wav ${readFileSync(wav).length}b`);
     rmSync(oga, { force: true }); rmSync(wav, { force: true });
     const body = {
       model: "local-model", max_tokens: 512, temperature: 0,
+      // Disable thinking: transcription needs none, and with it on the model spends its
+      // output on reasoning_content and leaves content EMPTY. This puts the text in content.
+      chat_template_kwargs: { enable_thinking: false },
       messages: [{ role: "user", content: [
         { type: "text", text: "Transcribe the spoken audio to text. Output ONLY the exact words spoken — no preamble, no quotation marks, no commentary." },
         { type: "input_audio", input_audio: { data: b64, format: "wav" } },
       ] }],
     };
     const r = await fetch(LLM_URL, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body), signal: AbortSignal.timeout(120000) });
-    if (!r.ok) { log(`transcribe: llm ${r.status}`); return null; }
-    return (await r.json()).choices?.[0]?.message?.content?.trim() || null;
+    if (!r.ok) { log(`transcribe: llm ${r.status} ${(await r.text()).slice(0, 150)}`); return null; }
+    const txt = (await r.json()).choices?.[0]?.message?.content?.trim() || null;
+    log(`transcribe: llm 200, transcript=${txt ? txt.length + "ch" : "EMPTY"}`);
+    return txt;
   } catch (e) {
     log("transcribe error:", e?.message ?? e);
     return null;
