@@ -148,6 +148,7 @@ Skills are on-demand capability packages ([Agent Skills standard](https://agents
 | `calendar` | Google Calendar (list / agenda / today / search). Read-only. |
 | `youtube` | Video transcripts (summarize any video) + your subscriptions & new-videos feed. |
 | `weather` | Current conditions + forecast via Open-Meteo (no API key). |
+| `transit` | German public-transport / Deutsche Bahn connections, departures, delays & platforms via the free transport.rest DB API (no key). |
 | `websearch` | Web search via the private SearXNG instance. |
 | `web-read` | Fetch a URL and extract its main readable text (to summarize/answer from). |
 | `browser` | Drive a fresh headless browser — open/click/fill/navigate via accessibility-ref snapshots (Playwright CLI). For interaction; sandboxed, logged-out. |
