@@ -15,7 +15,7 @@
 // Config (env): TELEGRAM_BOT_TOKEN (required), TELEGRAM_CHAT_ID (your chat — required to
 // reply; until set, the bot logs incoming chat ids so you can find yours).
 import { spawn } from "node:child_process";
-import { writeFileSync, readFileSync, rmSync } from "node:fs";
+import { writeFileSync, readFileSync, rmSync, readdirSync } from "node:fs";
 
 const TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const ALLOWED = process.env.TELEGRAM_CHAT_ID ? String(process.env.TELEGRAM_CHAT_ID) : "";
@@ -30,16 +30,23 @@ const log = (...a) => console.log("[bot]", ...a);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // ---- conversational session continuity ----
-// Each chat resumes the same pi session (--session-id) so follow-ups work ("…move that to 3").
-// The conversation persists until the USER resets it (/new or /reset) — no idle/age timeout;
-// you decide when to start over. Size stays bounded regardless because pi auto-compacts the
-// context (context-saver). State is in-memory, so a bot restart also starts fresh (durable
-// facts live in the memory system, not the session). Scheduled jobs are stateless — no id.
-const sessions = new Map(); // chatId -> sessionId (kept until /new or a bot restart)
-function sessionIdFor(chatId) {
-  let id = sessions.get(chatId);
-  if (!id) { id = `core-tg-${chatId}-${Date.now()}`; sessions.set(chatId, id); log(`new session ${id}`); }
-  return id;
+// Each chat is ONE persistent conversation, resumed by a STABLE session id so it survives bot
+// restarts — matching what you see in the Telegram app, where the old messages are right there.
+// It continues until you send /new (or /reset), which deletes the session so the next message
+// starts fresh. Size stays bounded by pi's auto-compaction. Stored in its own dir, isolated
+// from core.sh and one-shots. Scheduled jobs are stateless (no id).
+const TG_SESSION_DIR = "/app/.pi/sessions-tg";
+const sessionIdFor = (chatId) => `core-tg-${chatId}`;
+// Delete a chat's session file(s) so the next message starts a fresh conversation.
+function resetSession(chatId) {
+  const id = sessionIdFor(chatId);
+  let n = 0;
+  try {
+    for (const f of readdirSync(TG_SESSION_DIR)) {
+      if (f === `${id}.jsonl` || f.endsWith(`_${id}.jsonl`)) { rmSync(`${TG_SESSION_DIR}/${f}`, { force: true }); n++; }
+    }
+  } catch { /* dir may not exist yet — nothing to reset */ }
+  return n;
 }
 
 if (!TOKEN) {
@@ -122,7 +129,7 @@ async function downloadTgFile(fileId, base) {
 // forever); detached → own process group so the timeout can kill the whole tree.
 function runAgent(prompt, imagePath, handlers = {}, sessionId) {
   return new Promise((resolve) => {
-    const head = sessionId ? ["--mode", "json", "--session-id", sessionId] : ["--mode", "json"];
+    const head = sessionId ? ["--mode", "json", "--session-dir", TG_SESSION_DIR, "--session-id", sessionId] : ["--mode", "json"];
     const tail = ["--model", MODEL, "-e", EXT];
     const args = imagePath ? [...head, `@${imagePath}`, prompt, ...tail] : [...head, prompt, ...tail];
     const p = spawn("pi", args, { cwd: "/app", detached: true, stdio: ["ignore", "pipe", "pipe"] });
@@ -306,9 +313,9 @@ async function poll() {
         if (chatId !== ALLOWED) { log(`ignoring chat ${chatId} (not the authorized chat).`); continue; }
         // Reset conversational context on demand (next message starts a fresh session).
         if (m.text && /^\/(new|reset)\b/i.test(m.text.trim())) {
-          sessions.delete(chatId);
-          log("session reset by user");
-          sendMsg(chatId, "🆕 Fresh start — I've cleared this conversation's context.").catch(() => {});
+          const n = resetSession(chatId);
+          log(`session reset by user (${n} file(s) deleted)`);
+          sendMsg(chatId, "🆕 Fresh start — cleared this conversation.").catch(() => {});
           continue;
         }
         if (m.voice || m.audio) { log("voice message"); enqueue(chatId, { voiceFileId: (m.voice || m.audio).file_id }); continue; }
