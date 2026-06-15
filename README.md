@@ -56,6 +56,12 @@ jobs on a schedule, and can reach you on Telegram — all running on your own bo
 
 ## Setup
 
+**Quick path:** run `./setup.sh` — it checks prerequisites, creates `.env`, generates the
+SearXNG secret, downloads the models, walks you through the optional integrations you want
+(Telegram / Sonos / GitHub / Google), and builds & starts the stack. It's idempotent — re-run it
+anytime to add an integration; it won't overwrite anything you've set. The manual steps below are
+the same thing by hand.
+
 ### 1. Get the models
 Three files go in `data/models/` (the helper script resumes interrupted downloads):
 
