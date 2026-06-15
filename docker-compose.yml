@@ -145,7 +145,7 @@ services:
       start_period: 90s
     environment:
       - LLAMA_ARG_HOST=0.0.0.0
-      - LLAMA_ARG_MODEL=/models/Llama-3.2-3B-Instruct-Q4_K_M.gguf
+      - LLAMA_ARG_MODEL=/models/Qwen2.5-3B-Instruct-Q5_K_M.gguf
       - LLAMA_ARG_ALIAS=util-model
       # Apply the model's chat template correctly for /v1/chat/completions.
       - LLAMA_ARG_JINJA=1

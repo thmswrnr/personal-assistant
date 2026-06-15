@@ -8,7 +8,7 @@ reaches services you connect (Gmail, Drive, Calendar, YouTube, the web), runs re
 jobs on a schedule, and can reach you on Telegram — all running on your own box.
 
 > **Status:** working end-to-end. The active model is **Gemma 4 12B** (text + vision) with a
-> small **Llama 3.2 3B** "utility" model for context work. `docker compose up -d` starts the
+> small **Qwen2.5 3B** "utility" model for context work. `docker compose up -d` starts the
 > stack; you drive Core through the `./core.sh` launcher (and optionally a Telegram bot). It
 > has real tool-calling + thinking, ~a dozen skills, a built-in scheduler, and automatic
 > context management. CPU/GPU: built for a single ~16 GB NVIDIA GPU.
@@ -24,7 +24,7 @@ jobs on a schedule, and can reach you on Telegram — all running on your own bo
    (Telegram bot ─────▶) │ bash · skills · scheduler  │ ──┐                   └─────────────────────────┘
                          └─────────────┬──────────────┘   │ http://llm-util:8080  ┌─────────────────────────┐
                                        │ volumes           └─────────────────────▶ │ llm-util (llama.cpp,GPU)│
-              ┌────────────────────────┼──────────────┐                            │ Llama 3.2 3B (distill/  │
+              ┌────────────────────────┼──────────────┐                            │ Qwen2.5 3B (distill/    │
            data/pi   data/storage  data/secrets   skills/                          │ compaction)             │
            (config)   (your files)   (tokens)    (capabilities)                    └─────────────────────────┘
                                        │ http://searxng:8080  ┌──────────────────────┐
@@ -64,7 +64,7 @@ Three files go in `data/models/` (the helper script resumes interrupted download
 scripts/download-model.sh unsloth/gemma-4-12b-it-GGUF gemma-4-12b-it-Q5_K_M.gguf
 scripts/download-model.sh unsloth/gemma-4-12b-it-GGUF mmproj-BF16.gguf
 # small utility model (distillation + fast compaction)
-scripts/download-model.sh bartowski/Llama-3.2-3B-Instruct-GGUF Llama-3.2-3B-Instruct-Q4_K_M.gguf
+scripts/download-model.sh bartowski/Qwen2.5-3B-Instruct-GGUF Qwen2.5-3B-Instruct-Q5_K_M.gguf
 ```
 
 ### 2. Environment
