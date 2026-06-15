@@ -20,9 +20,6 @@ CONTAINER="core_harness"
 # Context-saver extension: spills large JSON tool output to a file (the model queries it
 # with jq) to keep context lean. Auto-discovery doesn't load .mjs, so pass it explicitly.
 EXT="/app/.pi/extensions/context-saver.mjs"
-# Interactive sessions live in their own dir so `--continue` resumes the last *CLI* chat and
-# never picks up a Telegram session (the bot shares the project but uses the default dir).
-CLI_SESSIONS="/app/.pi/sessions-cli"
 
 # Allocate a TTY only when we actually have one (so piped/non-interactive use still works).
 if [ -t 0 ] && [ -t 1 ]; then TTY=(-it); else TTY=(-i); fi
@@ -47,20 +44,20 @@ case "${1:-}" in
     exec docker exec "${TTY[@]}" "$CONTAINER" pi -e "$EXT" --no-session -p "$*" --model "$MODEL"
     ;;
   -c|--continue)
-    # Resume the last interactive session (optionally with an opening message).
+    # Resume the last session (optionally with an opening message) — pi's native --continue.
     shift
     if [ $# -gt 0 ]; then
-      exec docker exec "${TTY[@]}" "$CONTAINER" pi -e "$EXT" --session-dir "$CLI_SESSIONS" --continue "$*" --model "$MODEL"
+      exec docker exec "${TTY[@]}" "$CONTAINER" pi -e "$EXT" --continue "$*" --model "$MODEL"
     else
-      exec docker exec "${TTY[@]}" "$CONTAINER" pi -e "$EXT" --session-dir "$CLI_SESSIONS" --continue --model "$MODEL"
+      exec docker exec "${TTY[@]}" "$CONTAINER" pi -e "$EXT" --continue --model "$MODEL"
     fi
     ;;
   "")
     # New interactive session.
-    exec docker exec "${TTY[@]}" "$CONTAINER" pi -e "$EXT" --session-dir "$CLI_SESSIONS" --model "$MODEL"
+    exec docker exec "${TTY[@]}" "$CONTAINER" pi -e "$EXT" --model "$MODEL"
     ;;
   *)
     # New interactive session, seeded with an opening prompt.
-    exec docker exec "${TTY[@]}" "$CONTAINER" pi -e "$EXT" --session-dir "$CLI_SESSIONS" --model "$MODEL" "$*"
+    exec docker exec "${TTY[@]}" "$CONTAINER" pi -e "$EXT" --model "$MODEL" "$*"
     ;;
 esac

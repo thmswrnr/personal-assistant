@@ -30,20 +30,20 @@ const log = (...a) => console.log("[bot]", ...a);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // ---- conversational session continuity ----
-// Each chat is ONE persistent conversation, resumed by a STABLE session id so it survives bot
-// restarts — matching what you see in the Telegram app, where the old messages are right there.
-// It continues until you send /new (or /reset), which deletes the session so the next message
-// starts fresh. Size stays bounded by pi's auto-compaction. Stored in its own dir, isolated
-// from core.sh and one-shots. Scheduled jobs are stateless (no id).
-const TG_SESSION_DIR = "/app/.pi/sessions-tg";
+// Each chat is ONE persistent conversation, resumed by a STABLE pi session id so it survives
+// bot restarts — matching what you see in the Telegram app, where the old messages are right
+// there. It continues until you send /new (or /reset), which deletes the session so the next
+// message starts fresh. Size stays bounded by pi's auto-compaction. Uses pi's default session
+// dir (cwd = /app → project "--app--"); no custom dir. Scheduled/one-shot runs are stateless.
+const SESSION_DIR = "/app/.pi/sessions/--app--";
 const sessionIdFor = (chatId) => `core-tg-${chatId}`;
 // Delete a chat's session file(s) so the next message starts a fresh conversation.
 function resetSession(chatId) {
   const id = sessionIdFor(chatId);
   let n = 0;
   try {
-    for (const f of readdirSync(TG_SESSION_DIR)) {
-      if (f === `${id}.jsonl` || f.endsWith(`_${id}.jsonl`)) { rmSync(`${TG_SESSION_DIR}/${f}`, { force: true }); n++; }
+    for (const f of readdirSync(SESSION_DIR)) {
+      if (f === `${id}.jsonl` || f.endsWith(`_${id}.jsonl`)) { rmSync(`${SESSION_DIR}/${f}`, { force: true }); n++; }
     }
   } catch { /* dir may not exist yet — nothing to reset */ }
   return n;
@@ -129,7 +129,7 @@ async function downloadTgFile(fileId, base) {
 // forever); detached → own process group so the timeout can kill the whole tree.
 function runAgent(prompt, imagePath, handlers = {}, sessionId) {
   return new Promise((resolve) => {
-    const head = sessionId ? ["--mode", "json", "--session-dir", TG_SESSION_DIR, "--session-id", sessionId] : ["--mode", "json"];
+    const head = sessionId ? ["--mode", "json", "--session-id", sessionId] : ["--mode", "json"];
     const tail = ["--model", MODEL, "-e", EXT];
     const args = imagePath ? [...head, `@${imagePath}`, prompt, ...tail] : [...head, prompt, ...tail];
     const p = spawn("pi", args, { cwd: "/app", detached: true, stdio: ["ignore", "pipe", "pipe"] });
