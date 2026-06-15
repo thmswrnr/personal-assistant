@@ -2,7 +2,9 @@
 # Easy interface to talk to Core (the local assistant).
 #
 # Usage:
-#   ./core.sh                          Interactive chat (type messages; /exit or Ctrl-C to quit)
+#   ./core.sh                          Interactive chat (type messages; /exit or Ctrl-C to quit).
+#                                      In-session: /new resets, /resume picks a past session.
+#                                      One-shot modes below are stateless (--no-session).
 #   ./core.sh "summarize my notes"     Interactive, seeded with an opening message
 #   ./core.sh -p "what is 2+2?"        One-shot: print the answer and exit
 #   ./core.sh skill morning-briefing   Run a skill by name (reliable — loads the full skill)
@@ -35,11 +37,11 @@ case "${1:-}" in
     shift
     [ $# -ge 1 ] || { echo "usage: ./core.sh skill <name> [args]" >&2; exit 1; }
     name="$1"; shift
-    exec docker exec "${TTY[@]}" "$CONTAINER" pi -e "$EXT" -p "/skill:${name}${*:+ $*}" --model "$MODEL"
+    exec docker exec "${TTY[@]}" "$CONTAINER" pi -e "$EXT" --no-session -p "/skill:${name}${*:+ $*}" --model "$MODEL"
     ;;
   -p|--print)
     shift
-    exec docker exec "${TTY[@]}" "$CONTAINER" pi -e "$EXT" -p "$*" --model "$MODEL"
+    exec docker exec "${TTY[@]}" "$CONTAINER" pi -e "$EXT" --no-session -p "$*" --model "$MODEL"
     ;;
   "")
     exec docker exec "${TTY[@]}" "$CONTAINER" pi -e "$EXT" --model "$MODEL"
