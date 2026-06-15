@@ -37,20 +37,25 @@ $S mute set true          # or: false
 
 ## Playing music
 
-- **Sonos Favorites** (simplest — whatever the user saved in the app):
-  ```bash
-  $S favorites             # list them
-  $S favorites play "Morning Jazz"
-  ```
-- **A specific Spotify item** (starts playback): use `open` with a Spotify URI.
-  ```bash
-  $S open spotify:track:6NmXV4o6bmp704aPGyTVVG
-  ```
-- **By search** — find an item, then play it:
-  ```bash
-  $S search --service Spotify --category tracks "miles davis so what"   # returns URIs
-  $S open spotify:track:<id-from-results>
-  ```
+**Favorites are the primary, service-agnostic way** — they play whatever the user saved in the
+Sonos app (YouTube Music, Spotify, radio, …) with no extra auth. The user uses **YouTube Music**,
+so favorites are the main path here.
+```bash
+$S favorites list                 # show saved favorites (title + index)
+$S favorites open "__izzy__"      # play one by title …
+$S favorites open 1               # … or by index
+```
+
+**Spotify only** has direct search/play (the CLI is Spotify-built):
+```bash
+$S open spotify:track:6NmXV4o6bmp704aPGyTVVG          # play a Spotify URI
+$S search --service Spotify --category tracks "…"     # find Spotify URIs, then `open` one
+```
+
+**YouTube Music / other services:** direct `search` does NOT work without a one-time
+`sonos auth smapi` link, so don't try to search YT Music — use a **favorite** instead. If the
+user asks for something not in favorites, tell them to save it as a Sonos Favorite in the app
+(or ask whether a Spotify version is fine).
 
 ## How to use it
 1. Map the request to the right command. "Turn it up" → `volume set +5` (or a sensible step);
