@@ -31,23 +31,15 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // ---- conversational session continuity ----
 // Each chat resumes the same pi session (--session-id) so follow-ups work ("…move that to 3").
-// Bounded so it never grows endlessly: pi auto-compacts the context (context-saver), the
-// session resets after IDLE_TTL of silence, rotates after MAX_AGE even if active, and /new
-// resets on demand. State is in-memory only (a restart starts fresh; durable facts live in
-// the memory system, not the session). Scheduled jobs are stateless — they don't pass a
-// session id at all.
-const IDLE_TTL = 10 * 60 * 1000;       // 10 min silence → fresh conversation
-const MAX_AGE = 24 * 60 * 60 * 1000;   // 24 h backstop → rotate even if still active
-const sessions = new Map();            // chatId -> { id, started, lastSeen }
-function sessionIdFor(chatId, now = Date.now()) {
-  let s = sessions.get(chatId);
-  if (!s || now - s.lastSeen > IDLE_TTL || now - s.started > MAX_AGE) {
-    s = { id: `core-tg-${chatId}-${now}`, started: now };
-    log(`new session ${s.id}`);
-  }
-  s.lastSeen = now;
-  sessions.set(chatId, s);
-  return s.id;
+// The conversation persists until the USER resets it (/new or /reset) — no idle/age timeout;
+// you decide when to start over. Size stays bounded regardless because pi auto-compacts the
+// context (context-saver). State is in-memory, so a bot restart also starts fresh (durable
+// facts live in the memory system, not the session). Scheduled jobs are stateless — no id.
+const sessions = new Map(); // chatId -> sessionId (kept until /new or a bot restart)
+function sessionIdFor(chatId) {
+  let id = sessions.get(chatId);
+  if (!id) { id = `core-tg-${chatId}-${Date.now()}`; sessions.set(chatId, id); log(`new session ${id}`); }
+  return id;
 }
 
 if (!TOKEN) {
