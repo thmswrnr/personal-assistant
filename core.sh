@@ -5,6 +5,8 @@
 #   ./core.sh                          Interactive chat (type messages; /exit or Ctrl-C to quit).
 #                                      In-session: /new resets, /resume picks a past session.
 #                                      One-shot modes below are stateless (--no-session).
+#   ./core.sh continue                 Resume your most recent interactive session (-c).
+#   ./core.sh resume                   Pick a past session to resume from a list (-r).
 #   ./core.sh "summarize my notes"     Interactive, seeded with an opening message
 #   ./core.sh -p "what is 2+2?"        One-shot: print the answer and exit
 #   ./core.sh skill morning-briefing   Run a skill by name (reliable — loads the full skill)
@@ -42,6 +44,19 @@ case "${1:-}" in
   -p|--print)
     shift
     exec docker exec "${TTY[@]}" "$CONTAINER" pi -e "$EXT" --no-session -p "$*" --model "$MODEL"
+    ;;
+  continue|-c)
+    # Resume the most recent interactive session (optionally with an opening message).
+    shift
+    if [ $# -gt 0 ]; then
+      exec docker exec "${TTY[@]}" "$CONTAINER" pi -e "$EXT" --model "$MODEL" --continue "$*"
+    else
+      exec docker exec "${TTY[@]}" "$CONTAINER" pi -e "$EXT" --model "$MODEL" --continue
+    fi
+    ;;
+  resume|-r)
+    # Open pi's picker to choose a past session to resume.
+    exec docker exec "${TTY[@]}" "$CONTAINER" pi -e "$EXT" --model "$MODEL" --resume
     ;;
   "")
     exec docker exec "${TTY[@]}" "$CONTAINER" pi -e "$EXT" --model "$MODEL"
