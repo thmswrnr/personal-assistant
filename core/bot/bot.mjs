@@ -145,7 +145,8 @@ function runAgent(prompt, imagePath, handlers = {}) {
 // Build the transient "🔧 …" status line shown while a tool runs — capitalized and detailed
 // (which command, which file). The trailing "…" is added by the renderer, not here.
 function toolStatus(name, args = {}) {
-  const trim = (s, n = 56) => { s = String(s).replace(/\s+/g, " ").trim(); return s.length > n ? s.slice(0, n - 1) + "…" : s; };
+  // No ellipsis on truncation — the renderer always appends "…", which reads as "in progress".
+  const trim = (s, n = 56) => { s = String(s).replace(/\s+/g, " ").trim(); return s.length > n ? s.slice(0, n) : s; };
   const base = (p) => String(p).split("/").filter(Boolean).pop() || String(p);
   switch (name) {
     case "bash": {
