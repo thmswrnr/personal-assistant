@@ -14,6 +14,11 @@ Drive a real (headless) browser with the `playwright-cli` tool — plain shell c
 off the page's **accessibility snapshot**: every interactive element gets a stable ref like `e7`,
 and you act on it by ref. Reason over the snapshot *text*, not pixels.
 
+**`snapshot` is how you SEE and READ a page** — it returns the page's text *and* its interactive
+elements as compact YAML. You do **not** need a screenshot to read a page; the snapshot already
+contains the content. Reading the snapshot is the default, cheap, reliable path — screenshots are
+a rare last resort (see below), not the normal way to look at a page.
+
 The browser is a **fresh, sandboxed session — not logged into any of the user's accounts.**
 
 ## The loop
@@ -36,10 +41,15 @@ $B close                          # shut the browser when the task is done
 
 ## Reading a page
 `snapshot` returns a YAML tree of headings, paragraphs, links (with URLs), inputs, and buttons —
-usually enough to read or answer from. For a long article's full text, `web-read` is simpler. If
-a page is highly visual or the snapshot is unhelpful, fall back to vision:
+that **is** your view of the page; read/answer from it directly. For a long article's full text,
+`web-read` is simpler.
+
+**Do NOT screenshot just to read a page** — the snapshot already has the text, and a screenshot
+is far more expensive and less reliable for you. Use `screenshot` ONLY when (a) the user
+explicitly asks for an image, or (b) `snapshot` comes back empty/useless (e.g. a `<canvas>`,
+map, or chart with no accessible text). Then:
 ```bash
-$B screenshot /tmp/page.png       # then view /tmp/page.png with your image/vision tool
+$B screenshot --filename /tmp/page.png   # then view /tmp/page.png with your image/vision tool
 ```
 
 ## How to use it
