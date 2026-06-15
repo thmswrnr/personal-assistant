@@ -1,6 +1,6 @@
 ---
 name: sonos
-description: Control the user's Sonos speaker/soundbar — play, pause, skip, set volume, mute, and play music (Spotify or Sonos favorites). Use when the user says "play music/<song/artist>", "pause", "stop", "next/previous track", "turn it up/down", "set volume to N", "mute", or "what's playing". Local network only.
+description: Control the user's Sonos speaker/soundbar — play a saved favorite (playlists/stations), pause, resume, stop, skip, set volume, mute, and report what's playing. Use when the user says "play <name>/my playlist/some music", "pause", "stop", "next/previous", "turn it up/down", "set volume to N", "mute", or "what's playing". Local network only.
 metadata:
   {
     "openclaw":
@@ -10,58 +10,56 @@ metadata:
 
 # Sonos
 
-Control the Sonos speaker over the local network with the `sonos` CLI. No login needed — it
-uses the music services already linked in the user's Sonos app (e.g. Spotify).
+Control the Sonos speaker over the local network with the `sonos` CLI. No login needed.
 
-**Always target the speaker by IP** with `--ip "$SONOS_HOST"` (the env var holds the speaker's
-address). Name-based discovery uses multicast, which doesn't work from inside the container — so
-never rely on `--name`. If `$SONOS_HOST` is empty, tell the user to set `SONOS_HOST` in `.env`
-(their speaker's IP) and don't guess.
+**Always target the speaker by IP** with `--ip "$SONOS_HOST"`. Name-based discovery uses
+multicast, which doesn't work from inside the container, so never use `--name`. If `$SONOS_HOST`
+is empty, tell the user to set `SONOS_HOST` (their speaker's IP) in `.env` — don't guess.
 
-## Common commands (run via bash)
-
+Define the prefix once, then use `$S` for every call:
 ```bash
 S="sonos --ip $SONOS_HOST --timeout 10s"
+```
 
-$S status                 # what's playing (track, state, volume)
-$S play                   # resume
+## Playback control
+```bash
+$S status            # what's playing (track, state, volume) — use for "what's playing?"
+$S play              # resume
 $S pause
 $S stop
-$S next                   # skip
+$S next              # skip
 $S prev
 $S volume get
-$S volume set 25          # 0–100
-$S volume set +5          # relative up/down also work (e.g. -5)
-$S mute set true          # or: false
+$S volume set 25     # absolute 0–100
+$S volume set +5     # or relative (e.g. -5). "turn it up/down" → ±5–10; don't jump to extremes
+$S mute set true     # or false
 ```
 
-## Playing music
+## Playing music — ALWAYS list favorites first, then open by exact title
 
-**Favorites are the primary, service-agnostic way** — they play whatever the user saved in the
-Sonos app (YouTube Music, Spotify, radio, …) with no extra auth. The user uses **YouTube Music**,
-so favorites are the main path here.
-```bash
-$S favorites list                 # show saved favorites (title + index)
-$S favorites open "__izzy__"      # play one by title …
-$S favorites open 1               # … or by index
-```
+Music plays from the user's **Sonos Favorites** (the playlists/stations saved in the Sonos app —
+YouTube Music, radio, etc.). To play something, follow these steps **in order**:
 
-**Spotify only** has direct search/play (the CLI is Spotify-built):
-```bash
-$S open spotify:track:6NmXV4o6bmp704aPGyTVVG          # play a Spotify URI
-$S search --service Spotify --category tracks "…"     # find Spotify URIs, then `open` one
-```
+1. **List favorites first — never guess the title:**
+   ```bash
+   $S favorites list
+   ```
+   Prints `POS  TITLE  URI`. (For example, the user's main playlist shows as the title `__izzy__`.)
+2. **Match the user's words to a favorite's TITLE** — case-insensitive substring. The spoken
+   name is often approximate (e.g. "izzy" or "easy" → the title `__izzy__`). If several titles
+   match, ask which; if none match, tell the user it isn't a saved favorite and to add it in the
+   Sonos app — do **not** substitute something else or search elsewhere.
+3. **Open it by its EXACT title from the list**, quoted — **not** the position number (`open`
+   matches titles, not indices):
+   ```bash
+   $S favorites open "__izzy__"
+   ```
 
-**YouTube Music / other services:** direct `search` does NOT work without a one-time
-`sonos auth smapi` link, so don't try to search YT Music — use a **favorite** instead. If the
-user asks for something not in favorites, tell them to save it as a Sonos Favorite in the app
-(or ask whether a Spotify version is fine).
+> **Do NOT use `search`, `smapi`, `open spotify:…`, or any service search.** The user's music is
+> in YouTube Music and reached only through favorites; direct service search isn't authenticated
+> and will just fail. Favorites are the only music path here: **list → match → open by title.**
 
-## How to use it
-1. Map the request to the right command. "Turn it up" → `volume set +5` (or a sensible step);
-   "play some jazz" → a favorite if one fits, else search Spotify and `open` the top hit.
-2. After an action, confirm briefly in plain language ("▶️ Playing — volume 25"). Use `status`
-   to answer "what's playing?".
-3. Volumes: don't jump to extremes. If unspecified, nudge by ±5–10 rather than guessing absolute.
-4. If a command errors with a network/timeout, the speaker may be off or the IP changed — say so
-   plainly; don't pretend it played.
+## After acting
+Confirm briefly in plain language ("▶️ Playing __izzy__ — volume 6", "⏸ Paused", "🔉 Volume 20").
+If a command errors with a network/timeout, the speaker may be off or its IP changed — say so
+plainly; never claim something played when it didn't.
