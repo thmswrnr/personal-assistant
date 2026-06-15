@@ -29,6 +29,27 @@ const LLM_URL = process.env.LLM_URL ?? "http://llm:8080/v1/chat/completions";
 const log = (...a) => console.log("[bot]", ...a);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+// ---- conversational session continuity ----
+// Each chat resumes the same pi session (--session-id) so follow-ups work ("…move that to 3").
+// Bounded so it never grows endlessly: pi auto-compacts the context (context-saver), the
+// session resets after IDLE_TTL of silence, rotates after MAX_AGE even if active, and /new
+// resets on demand. State is in-memory only (a restart starts fresh; durable facts live in
+// the memory system, not the session). Scheduled jobs are stateless — they don't pass a
+// session id at all.
+const IDLE_TTL = 10 * 60 * 1000;       // 10 min silence → fresh conversation
+const MAX_AGE = 24 * 60 * 60 * 1000;   // 24 h backstop → rotate even if still active
+const sessions = new Map();            // chatId -> { id, started, lastSeen }
+function sessionIdFor(chatId, now = Date.now()) {
+  let s = sessions.get(chatId);
+  if (!s || now - s.lastSeen > IDLE_TTL || now - s.started > MAX_AGE) {
+    s = { id: `core-tg-${chatId}-${now}`, started: now };
+    log(`new session ${s.id}`);
+  }
+  s.lastSeen = now;
+  sessions.set(chatId, s);
+  return s.id;
+}
+
 if (!TOKEN) {
   log("TELEGRAM_BOT_TOKEN not set — bridge disabled. Set it in .env to enable the phone bridge.");
   process.exit(0);
@@ -107,9 +128,9 @@ async function downloadTgFile(fileId, base) {
 // tool start/end so the UI can show "🔧 …". imagePath (optional) is attached as a `@file`
 // positional so the model sees the image. stdin ignored (an open stdin pipe makes pi hang
 // forever); detached → own process group so the timeout can kill the whole tree.
-function runAgent(prompt, imagePath, handlers = {}) {
+function runAgent(prompt, imagePath, handlers = {}, sessionId) {
   return new Promise((resolve) => {
-    const head = ["--mode", "json"];
+    const head = sessionId ? ["--mode", "json", "--session-id", sessionId] : ["--mode", "json"];
     const tail = ["--model", MODEL, "-e", EXT];
     const args = imagePath ? [...head, `@${imagePath}`, prompt, ...tail] : [...head, prompt, ...tail];
     const p = spawn("pi", args, { cwd: "/app", detached: true, stdio: ["ignore", "pipe", "pipe"] });
@@ -254,12 +275,13 @@ async function enqueue(chatId, job) {
         lastShown = text; lastEdit = now;
         await editMsg(j.chatId, statusId, text.length > 4096 ? text.slice(0, 4090) + "…" : text);
       };
+      const sessionId = sessionIdFor(j.chatId); // resume this chat's conversation (bounded; see top)
       const r = await runAgent(prompt, imagePath, {
         onAssistantStart: () => { answer = ""; },         // show only the latest message's text
         onDelta: (d) => { answer += d; render(false); },
         onTool: (name, args) => { tool = toolStatus(name, args); render(true); },
         onToolEnd: () => { tool = ""; },
-      });
+      }, sessionId);
       const secs = Number(process.hrtime.bigint() - t0) / 1e9;
       const reply = answer.trim() || (r.code === 0 ? "(no output)" : `⚠️ agent error: ${r.err || "failed"}`);
       log(`run done in ${secs.toFixed(0)}s: exit=${r.code} out=${reply.length}ch${r.err ? ` err=${r.err.slice(0, 80)}` : ""}`);
@@ -290,6 +312,13 @@ async function poll() {
         const chatId = String(m.chat.id);
         if (!ALLOWED) { log(`message from chat ${chatId} — set TELEGRAM_CHAT_ID=${chatId} in .env, then restart the bot.`); continue; }
         if (chatId !== ALLOWED) { log(`ignoring chat ${chatId} (not the authorized chat).`); continue; }
+        // Reset conversational context on demand (next message starts a fresh session).
+        if (m.text && /^\/(new|reset)\b/i.test(m.text.trim())) {
+          sessions.delete(chatId);
+          log("session reset by user");
+          sendMsg(chatId, "🆕 Fresh start — I've cleared this conversation's context.").catch(() => {});
+          continue;
+        }
         if (m.voice || m.audio) { log("voice message"); enqueue(chatId, { voiceFileId: (m.voice || m.audio).file_id }); continue; }
         const imgDoc = m.document && m.document.mime_type?.startsWith("image/");
         if (m.photo?.length || imgDoc) {
