@@ -1,10 +1,14 @@
 #!/usr/bin/env node
 // Core's Telegram bridge (OPTIONAL — Core runs fine without it). Zero-dep Node.
 //
-// Long-polls Telegram; each text message from the AUTHORIZED chat is run through the
-// Core agent (`pi -p …`, same model/skills/extension as core.sh) and the answer is sent
-// back. Messages from any other chat are ignored (hard single-user lock). Because the
-// bridge can send messages, it's also the channel the `notify` skill uses.
+// Long-polls Telegram; each message from the AUTHORIZED chat is run through the Core agent
+// (`pi`, same model/skills/extension as core.sh) and the answer is sent back. Handles text,
+// voice notes (transcribed by the local model's audio encoder), and images/photos (Core sees
+// them via the model's vision). Messages from any other chat are ignored (single-user lock).
+// Because the bridge can send messages, it's also the channel the `notify` skill uses.
+//
+// Responsiveness: each job posts a status message ("🤔 Working on it…") immediately and keeps
+// the typing indicator alive, then EDITS that message into the final answer.
 //
 // Scheduling lives in Core (the scheduler service), NOT here — this is just a messenger.
 //
@@ -18,8 +22,8 @@ const ALLOWED = process.env.TELEGRAM_CHAT_ID ? String(process.env.TELEGRAM_CHAT_
 const MODEL = process.env.CORE_MODEL ?? "local/local-model";
 const EXT = "/app/.pi/extensions/context-saver.mjs";
 const API = `https://api.telegram.org/bot${TOKEN}`;
-// The local model also handles audio (the vision projector includes an audio encoder),
-// so voice notes are transcribed by the main model — no separate STT service.
+// The local model also handles audio (the projector includes an audio encoder), so voice
+// notes are transcribed by the main model — no separate STT service.
 const LLM_URL = process.env.LLM_URL ?? "http://llm:8080/v1/chat/completions";
 
 const log = (...a) => console.log("[bot]", ...a);
@@ -30,6 +34,7 @@ if (!TOKEN) {
   process.exit(0);
 }
 
+// ---- Telegram helpers ----
 async function tg(method, body) {
   const res = await fetch(`${API}/${method}`, {
     method: "POST",
@@ -40,6 +45,25 @@ async function tg(method, body) {
   return res.json();
 }
 
+// Send a message, return its message_id (for later editing).
+async function sendMsg(chatId, text) {
+  try {
+    const r = await tg("sendMessage", { chat_id: chatId, text: (text || "(no output)").slice(0, 4096) });
+    return r?.result?.message_id;
+  } catch (e) {
+    log("sendMsg error:", e.message);
+    return undefined;
+  }
+}
+
+// Edit a message (falls back to a fresh send if we have no message_id).
+async function editMsg(chatId, id, text) {
+  if (!id) return void (await send(chatId, text));
+  try { await tg("editMessageText", { chat_id: chatId, message_id: id, text: (text || "(no output)").slice(0, 4096) }); }
+  catch (e) { log("edit error:", e.message); }
+}
+
+// Plain send, chunked to Telegram's 4096-char limit.
 async function send(chatId, text) {
   const t = text || "(no output)";
   for (let i = 0; i < t.length; i += 4000) {
@@ -48,13 +72,44 @@ async function send(chatId, text) {
   }
 }
 
-function runAgent(prompt) {
+// Turn the status message into the answer; spill overflow to follow-up messages.
+async function editOrSend(chatId, id, text) {
+  text = text || "(no output)";
+  if (!id || text.length <= 4096) return void (await editMsg(chatId, id, text));
+  await editMsg(chatId, id, text.slice(0, 4096));
+  for (let i = 4096; i < text.length; i += 4000) await send(chatId, text.slice(i, i + 4000));
+}
+
+// Keep the "typing…" indicator alive (Telegram's expires after ~5s). Returns a stop fn.
+function keepTyping(chatId) {
+  const ping = () => tg("sendChatAction", { chat_id: chatId, action: "typing" }).catch(() => {});
+  ping();
+  const iv = setInterval(ping, 4000);
+  return () => clearInterval(iv);
+}
+
+// Download a Telegram file to /tmp, preserving its extension. Returns the path (or null).
+async function downloadTgFile(fileId, base) {
+  const gf = await (await fetch(`${API}/getFile?file_id=${fileId}`, { signal: AbortSignal.timeout(20000) })).json();
+  const path = gf.result?.file_path;
+  if (!path) { log(`getFile: no path${gf.ok === false ? ` (${gf.description})` : ""}`); return null; }
+  const dl = await fetch(`https://api.telegram.org/file/bot${TOKEN}/${path}`, { signal: AbortSignal.timeout(30000) });
+  const ext = path.includes(".") ? path.split(".").pop() : "bin";
+  const out = `${base}.${ext}`;
+  writeFileSync(out, Buffer.from(await dl.arrayBuffer()));
+  return out;
+}
+
+// ---- agent run ----
+// Run a prompt through Core. imagePath (optional) is attached as a `@file` positional so the
+// model sees the image. stdin ignored (an open stdin pipe makes `pi -p` hang forever);
+// detached → own process group so the timeout can kill the whole tree.
+function runAgent(prompt, imagePath) {
   return new Promise((resolve) => {
-    // detached so pi leads its own process group — lets us kill the whole tree (pi + any
-    // tool subprocesses) on timeout, so a hung/runaway run can never wedge the queue.
-    // stdin MUST be ignored: with an open stdin pipe, `pi -p` runs the agent but then
-    // waits on stdin forever and never exits (no reply). detached → own group for timeout-kill.
-    const p = spawn("pi", ["-p", prompt, "--model", MODEL, "-e", EXT], { cwd: "/app", detached: true, stdio: ["ignore", "pipe", "pipe"] });
+    const args = imagePath
+      ? ["--print", `@${imagePath}`, prompt, "--model", MODEL, "-e", EXT]
+      : ["--print", prompt, "--model", MODEL, "-e", EXT];
+    const p = spawn("pi", args, { cwd: "/app", detached: true, stdio: ["ignore", "pipe", "pipe"] });
     let out = "", err = "", done = false;
     const finish = (r) => { if (done) return; done = true; clearTimeout(timer); resolve(r); };
     const timer = setTimeout(() => {
@@ -68,51 +123,49 @@ function runAgent(prompt) {
   });
 }
 
-// Transcribe a Telegram voice/audio file with the local model (its projector includes an
-// audio encoder). Download the OGG, convert to 16 kHz mono WAV via ffmpeg, send to the llm.
+function ffmpegTo16kWav(input, output) {
+  return new Promise((res, rej) => {
+    const ff = spawn("ffmpeg", ["-hide_banner", "-loglevel", "error", "-y", "-i", input, "-ar", "16000", "-ac", "1", output]);
+    let fe = "";
+    ff.stderr.on("data", (d) => (fe += d));
+    ff.on("close", (c) => (c === 0 ? res() : rej(new Error(`ffmpeg exit ${c}: ${fe.slice(0, 150)}`))));
+    ff.on("error", rej);
+  });
+}
+
+// Transcribe a Telegram voice/audio file with the local model (thinking off → text in content).
 async function transcribe(fileId) {
+  let oga, wav;
   try {
-    const gf = await (await fetch(`${API}/getFile?file_id=${fileId}`, { signal: AbortSignal.timeout(20000) })).json();
-    const path = gf.result?.file_path;
-    log(`transcribe: getFile path=${path || "NONE"}${gf.ok === false ? ` (${gf.description})` : ""}`);
-    if (!path) return null;
-    const dl = await fetch(`https://api.telegram.org/file/bot${TOKEN}/${path}`, { signal: AbortSignal.timeout(30000) });
-    const oga = `/tmp/v-${Date.now()}.oga`, wav = oga.replace(".oga", ".wav");
-    writeFileSync(oga, Buffer.from(await dl.arrayBuffer()));
-    log(`transcribe: downloaded ${readFileSync(oga).length}b -> ${oga}`);
-    await new Promise((res, rej) => {
-      const ff = spawn("ffmpeg", ["-hide_banner", "-loglevel", "error", "-y", "-i", oga, "-ar", "16000", "-ac", "1", wav]);
-      let fe = "";
-      ff.stderr.on("data", (d) => (fe += d));
-      ff.on("close", (c) => (c === 0 ? res() : rej(new Error(`ffmpeg exit ${c}: ${fe.slice(0, 200)}`))));
-      ff.on("error", rej);
-    });
-    const b64 = readFileSync(wav).toString("base64");
-    log(`transcribe: wav ${readFileSync(wav).length}b`);
-    rmSync(oga, { force: true }); rmSync(wav, { force: true });
+    oga = await downloadTgFile(fileId, `/tmp/v-${Date.now()}`);
+    if (!oga) return null;
+    wav = oga.replace(/\.[^.]+$/, ".wav");
+    await ffmpegTo16kWav(oga, wav);
     const body = {
       model: "local-model", max_tokens: 512, temperature: 0,
-      // Disable thinking: transcription needs none, and with it on the model spends its
-      // output on reasoning_content and leaves content EMPTY. This puts the text in content.
       chat_template_kwargs: { enable_thinking: false },
       messages: [{ role: "user", content: [
         { type: "text", text: "Transcribe the spoken audio to text. Output ONLY the exact words spoken — no preamble, no quotation marks, no commentary." },
-        { type: "input_audio", input_audio: { data: b64, format: "wav" } },
+        { type: "input_audio", input_audio: { data: readFileSync(wav).toString("base64"), format: "wav" } },
       ] }],
     };
     const r = await fetch(LLM_URL, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body), signal: AbortSignal.timeout(120000) });
     if (!r.ok) { log(`transcribe: llm ${r.status} ${(await r.text()).slice(0, 150)}`); return null; }
-    const txt = (await r.json()).choices?.[0]?.message?.content?.trim() || null;
-    log(`transcribe: llm 200, transcript=${txt ? txt.length + "ch" : "EMPTY"}`);
-    return txt;
+    return (await r.json()).choices?.[0]?.message?.content?.trim() || null;
   } catch (e) {
     log("transcribe error:", e?.message ?? e);
     return null;
+  } finally {
+    if (oga) rmSync(oga, { force: true });
+    if (wav) rmSync(wav, { force: true });
   }
 }
 
-// Serialize agent runs (one GPU) — queue jobs and process one at a time.
-// A job is { prompt } (text) or { voiceFileId } (a voice note to transcribe first).
+const IMAGE_PROMPT =
+  "Look at this image. If it's a document, receipt, or screenshot, extract the key information; " +
+  "otherwise describe what's in it and answer any implied question.";
+
+// ---- queue: one job at a time (shared GPU) ----
 let busy = false;
 const queue = [];
 async function enqueue(chatId, job) {
@@ -121,31 +174,45 @@ async function enqueue(chatId, job) {
   busy = true;
   while (queue.length) {
     const j = queue.shift();
+    const stop = keepTyping(j.chatId);
+    let statusId, imagePath;
     try {
       let prompt = j.prompt;
       if (j.voiceFileId) {
+        statusId = await sendMsg(j.chatId, "🎤 Transcribing…");
         const heard = await transcribe(j.voiceFileId);
-        if (!heard) { await send(j.chatId, "🎤 Sorry — couldn't transcribe that. Try again, or send text."); continue; }
+        if (!heard) { await editMsg(j.chatId, statusId, "🎤 Sorry — couldn't transcribe that. Try again, or send text."); continue; }
         log(`transcribed: ${heard.slice(0, 80)}`);
-        await send(j.chatId, `🎤 “${heard}”`); // echo what was heard, then act on it
+        await editMsg(j.chatId, statusId, `🎤 “${heard}”`); // heard echo stays visible
+        statusId = await sendMsg(j.chatId, "🤔 Working on it…");
         prompt = heard;
+      } else if (j.photoFileId) {
+        statusId = await sendMsg(j.chatId, "🖼️ Looking at the image…");
+        imagePath = await downloadTgFile(j.photoFileId, `/tmp/img-${Date.now()}`);
+        if (!imagePath) { await editMsg(j.chatId, statusId, "🖼️ Sorry — couldn't fetch that image."); continue; }
+        prompt = j.caption?.trim() || IMAGE_PROMPT;
+      } else {
+        statusId = await sendMsg(j.chatId, "🤔 Working on it…");
       }
-      tg("sendChatAction", { chat_id: j.chatId, action: "typing" }).catch(() => {});
       const t0 = process.hrtime.bigint();
-      const r = await runAgent(prompt);
+      const r = await runAgent(prompt, imagePath);
       const secs = Number(process.hrtime.bigint() - t0) / 1e9;
       log(`run done in ${secs.toFixed(0)}s: exit=${r.code} out=${r.out.length}ch${r.err ? ` err=${r.err.slice(0, 80)}` : ""}`);
       const reply = r.out || (r.code === 0 ? "(no output)" : `⚠️ agent error: ${r.err || "failed"}`);
-      await send(j.chatId, reply);
+      await editOrSend(j.chatId, statusId, reply);
       log(`replied (${reply.length}ch)`);
     } catch (e) {
       log(`job error: ${e?.message ?? e}`);
-      try { await send(j.chatId, `⚠️ ${e?.message ?? e}`); } catch { /* ignore */ }
+      try { await editOrSend(j.chatId, statusId, `⚠️ ${e?.message ?? e}`); } catch { /* ignore */ }
+    } finally {
+      stop();
+      if (imagePath) rmSync(imagePath, { force: true });
     }
   }
   busy = false;
 }
 
+// ---- long-poll ----
 async function poll() {
   let offset = 0;
   for (;;) {
@@ -160,6 +227,13 @@ async function poll() {
         if (!ALLOWED) { log(`message from chat ${chatId} — set TELEGRAM_CHAT_ID=${chatId} in .env, then restart the bot.`); continue; }
         if (chatId !== ALLOWED) { log(`ignoring chat ${chatId} (not the authorized chat).`); continue; }
         if (m.voice || m.audio) { log("voice message"); enqueue(chatId, { voiceFileId: (m.voice || m.audio).file_id }); continue; }
+        const imgDoc = m.document && m.document.mime_type?.startsWith("image/");
+        if (m.photo?.length || imgDoc) {
+          log("image message");
+          const fileId = m.photo?.length ? m.photo[m.photo.length - 1].file_id : m.document.file_id; // largest photo size
+          enqueue(chatId, { photoFileId: fileId, caption: m.caption });
+          continue;
+        }
         if (m.text) { log(`prompt: ${m.text.slice(0, 80)}`); enqueue(chatId, { prompt: m.text }); }
       }
     } catch (e) {
