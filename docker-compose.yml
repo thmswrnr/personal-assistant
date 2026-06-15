@@ -102,7 +102,7 @@ services:
       - LLAMA_ARG_N_GPU_LAYERS=-1
       # Performance: force Flash Attention (faster + less KV memory at 24K ctx).
       - LLAMA_ARG_FLASH_ATTN=on
-      # Cap Qwen3 thinking: bounds runaway <think> traces while leaving ample room for
+      # Cap the model's thinking: bounds runaway reasoning traces while leaving ample room for
       # genuine multi-step reasoning. -1=unlimited, 0=off, N=token budget.
       - LLAMA_ARG_THINK_BUDGET=1024
     deploy:

@@ -33,7 +33,8 @@ jobs on a schedule, and can reach you on Telegram — all running on your own bo
 ```
 
 - **`llm`** — llama.cpp CUDA server; loads the GGUF in `data/models/` + the vision projector,
-  serves an OpenAI-compatible API. One slot, 49 K context (single-user).
+  serves an OpenAI-compatible API. 3 slots over a **unified KV pool** (49 K total context shared
+  dynamically) so the interactive session, bot, and scheduler don't starve each other.
 - **`llm-util`** — a small, fast model used only by the context-saver extension to distill big
   tool output and summarize on compaction (keeps the main model's context lean).
 - **`searxng`** — self-hosted, private metasearch (the `websearch` skill); no API key.
@@ -112,16 +113,16 @@ Stop: `docker compose down`.
 
 | Host path | In `core` | Purpose |
 |---|---|---|
-| `data/pi/` | `/app/.pi` | pi config: `models.json`, `SYSTEM.md`, `extensions/`, plus pi runtime (`sessions/`, `context.md`, …) |
-| `data/storage/` | `/app/storage` | your files: `inbox/`, `notes/` (the second brain), `processed/`, `todos.md`, `schedule.json` |
+| `data/pi/` | `/app/.pi` | pi config: `models.json`, `SYSTEM.md`, `extensions/`, plus pi runtime (`sessions/`, …) |
+| `data/storage/` | `/app/storage` | your files: `inbox/`, `notes/` (the second brain), `processed/`, `todos.md`, `schedule.json`, `memory/` (long-term facts) |
 | `data/secrets/` | `/app/secrets` | OAuth creds / tokens (git-ignored) |
 | `data/models/` | `/models` (in `llm`) | the GGUF model files |
 | `skills/` | `/app/.pi/skills` | `SKILL.md` capability packages (version-controlled) |
 | `core/` | — | the core image (`Dockerfile`) + its runtime scripts (`scheduler/`, `bot/`) |
 | `searxng/` | `/etc/searxng` (in `searxng`) | SearXNG config |
 
-`data/` contents are git-ignored (only the authored config — `models.json`, `SYSTEM.md`,
-`extensions/context-saver.mjs` — is tracked). Your data stays local.
+`data/` contents are git-ignored (only the authored config — `models.json`, `SYSTEM.md`, and the
+`extensions/` source — is tracked). Your data, including `storage/memory/`, stays local.
 
 ---
 
@@ -145,6 +146,7 @@ Skills are on-demand capability packages ([Agent Skills standard](https://agents
 | `process-inbox` | Read each file in `inbox/` (incl. **images** via vision) → note + todos → archive. |
 | `morning-briefing` | Dated greeting + unread email + today's calendar + weather + a joke. |
 | `todos` | Maintain the single `todos.md` checklist. |
+| `remember` | Save / recall / forget durable facts (Core's long-term memory — see below). |
 
 > **Invoke skills with `/skill:<name>`** (or `./core.sh skill <name>`) for reliable execution.
 > pi uses *progressive disclosure*: only a skill's description is always in context; the full
@@ -153,10 +155,31 @@ Skills are on-demand capability packages ([Agent Skills standard](https://agents
 
 Add a skill by creating `skills/<name>/SKILL.md` (+ an optional CLI) and `docker compose restart core`.
 
-### Vision
-Gemma 4 is multimodal — Core can *see* images. Drop an image in `data/storage/inbox/` and run
-`process-inbox` (it reads receipts/screenshots/photos and files them), or point pi's `read`
-tool at an image file. (Audio input is a model capability too, but not yet wired up.)
+### Vision & voice
+Gemma 4 is multimodal — Core can *see* images and *hear* audio. Drop an image in
+`data/storage/inbox/` and run `process-inbox` (it reads receipts/screenshots/photos and files
+them), or point pi's `read` tool at an image file. Over the Telegram bridge you can also send
+photos (analysed via vision) and **voice notes** (transcribed by the model's own audio encoder —
+no separate speech-to-text service).
+
+---
+
+## Memory (long-term)
+
+Core runs are **stateless** — every command, scheduled job, and Telegram message is a fresh `pi`
+process. Long-term memory is how durable facts survive that: they're recorded as small files
+under `data/storage/memory/` (one fact per file), with an auto-generated `MEMORY.md` **index**.
+
+- The `memory.mjs` extension (registered from `context-saver.mjs`, so it loads on every entry
+  point) injects the index into the system prompt on **every** run — zero tool calls, always
+  present. Full fact files are read on demand only when relevant — the same *progressive
+  disclosure* as skills, so context stays lean.
+- The `remember` skill captures facts: `save` / `forget` / `list`, with the index regenerated on
+  every change (so it can't drift). Core saves a fact when you ask ("remember that…") or when a
+  clearly durable preference/fact emerges — not one-off details.
+
+The payoff: a scheduled `notify` or a one-off command runs with your preferences and key facts
+already in context — no re-asking, no stale assumptions.
 
 ---
 
@@ -218,9 +241,10 @@ run fine without it.
 3. Message your bot once, then `docker logs core_bot` — it prints your chat id. Put it in `.env`
    as `TELEGRAM_CHAT_ID` and run the start command again.
 
-Texts to your bot then run through Core and reply; the `notify` skill (and scheduled tasks) can
-message you. The bridge is **locked to your chat id** — it ignores everyone else. (Voice
-messages aren't supported yet.)
+Texts, **voice notes** (transcribed locally), and **photos** (read via vision) all run through
+Core and get a reply; the bot acks instantly and keeps a "typing…" indicator alive while it
+works. The `notify` skill (and scheduled tasks) can message you too. The bridge is **locked to
+your chat id** — it ignores everyone else.
 
 ---
 

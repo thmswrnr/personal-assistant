@@ -39,8 +39,8 @@ thing brief and scannable, not a wall of text.
    ```
    - Give a one-liner: current temp + conditions and today's high/low, and call out rain
      if the chance is notable (e.g. "pack an umbrella").
-   - If you don't know the user's city, ask once and remember it in `context.md`; skip
-     this step gracefully if it's still unknown or the command errors.
+   - If you don't know the user's city, ask once and save it with `/skill:remember` (so future
+     briefings have it); skip this step gracefully if it's still unknown or the command errors.
 
 5. **Joke.** Tell one short, clean joke.
 
