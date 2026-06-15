@@ -51,6 +51,9 @@ node /app/.pi/skills/remember/remember.mjs list
    same slug to correct it instead of creating a near-duplicate. Convert relative dates to
    absolute ones (e.g. "next Friday" → the actual date) so they don't rot.
 4. **Forget when asked** ("forget my old address") or when a fact becomes wrong.
-5. **Confirm briefly** in plain language ("Got it — I'll remember you're in Bonn"). Don't
-   save silently-sensitive things the user wouldn't expect you to keep; if unsure whether
-   something is worth remembering, ask.
+5. **Confirm briefly** in plain language ("Got it — I'll remember you're in Bonn"). If unsure
+   whether something is worth remembering, ask.
+6. **Never store secrets.** The index is loaded into context on *every* run, so memory must
+   never hold passwords, passphrases, PINs, door/locker codes, API tokens, or keys. Refuse to
+   `save` those — even if asked — and say why; use the secret for the task at hand but don't
+   persist it. Secrets belong in `/app/secrets/` (read inline, never echoed), not in memory.
