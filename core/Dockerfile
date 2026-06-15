@@ -47,6 +47,29 @@ RUN npm install -g @playwright/cli@0.1.14 \
     && chmod -R a+rx /ms-playwright \
     && rm -rf /var/lib/apt/lists/*
 
+# todo.txt-cli (pinned) for the todos + project-planning skills — the official `todo.sh`, a
+# single self-contained bash script (same pinned-download pattern as gh/yt-dlp above). A global
+# config at /etc/todo/config (auto-discovered by todo.sh) defaults TODO_DIR to /app/storage;
+# per-project lists just override TODO_DIR via env. TODOTXT_DATE_ON_ADD stamps creation dates.
+# (Placed after the heavy Chrome layer so editing it never busts that cache.)
+ARG TODOTXT_VERSION=2.13.0
+RUN curl -fsSL "https://github.com/todotxt/todo.txt-cli/releases/download/v${TODOTXT_VERSION}/todo.txt_cli-${TODOTXT_VERSION}.tar.gz" \
+      | tar -xz -C /tmp \
+    && mv "/tmp/todo.txt_cli-${TODOTXT_VERSION}/todo.sh" /usr/local/bin/todo.sh \
+    && chmod a+rx /usr/local/bin/todo.sh \
+    && rm -rf "/tmp/todo.txt_cli-${TODOTXT_VERSION}" \
+    && mkdir -p /etc/todo \
+    && printf '%s\n' \
+        'export TODO_DIR="${TODO_DIR:-/app/storage}"' \
+        'export TODO_FILE="$TODO_DIR/todo.txt"' \
+        'export DONE_FILE="$TODO_DIR/done.txt"' \
+        'export REPORT_FILE="$TODO_DIR/report.txt"' \
+        'export TODOTXT_DATE_ON_ADD=1' \
+        'export TODOTXT_DEFAULT_ACTION=ls' \
+      > /etc/todo/config \
+    && todo.sh -d /etc/todo/config -h >/dev/null \
+    && echo "todo.sh ${TODOTXT_VERSION} installed"
+
 WORKDIR /app
 # The Playwright CLI writes session/snapshot scratch (.playwright-cli/) to the working dir, so
 # /app must be writable by the non-root runtime user.
