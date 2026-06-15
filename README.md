@@ -10,7 +10,7 @@ jobs on a schedule, and can reach you on Telegram — all running on your own bo
 > **Status:** working end-to-end. The active model is **Gemma 4 12B** (text + vision) with a
 > small **Qwen2.5 3B** "utility" model for context work. `docker compose up -d` starts the
 > stack; you drive Core through the `./core.sh` launcher (and optionally a Telegram bot). It
-> has real tool-calling + thinking, ~a dozen skills, a built-in scheduler, and automatic
+> has real tool-calling + thinking, ~15 skills, a built-in scheduler, and automatic
 > context management. CPU/GPU: built for a single ~16 GB NVIDIA GPU.
 
 ---
@@ -90,12 +90,15 @@ services"; **Telegram** — see "Telegram bridge".
 ## Running — the `./core.sh` launcher
 
 ```bash
-./core.sh                          # interactive chat (/exit or Ctrl-C to quit)
+./core.sh                          # interactive chat, NEW session (/exit or Ctrl-C to quit)
+./core.sh --continue               # resume your last interactive session (-c) instead of new
 ./core.sh "what's on my calendar?" # interactive, seeded with an opening message
-./core.sh -p "summarize this: <url>"  # one-shot: print the answer and exit
+./core.sh -p "summarize this: <url>"  # one-shot: print the answer and exit (stateless)
 ./core.sh skill morning-briefing   # run a skill (force-loads the full skill — most reliable)
 ./core.sh skill process-inbox      # process files dropped in data/storage/inbox/
 ```
+Inside an interactive chat, `/new` starts a fresh session and `/resume` picks a past one
+(pi built-ins). One-shot modes (`-p`, `skill`) are stateless — they save no session.
 It starts the stack if needed, waits for the model, and loads the context-saver extension.
 
 ### Under the hood (equivalent raw commands)
@@ -244,9 +247,13 @@ run fine without it.
    as `TELEGRAM_CHAT_ID` and run the start command again.
 
 Texts, **voice notes** (transcribed locally), and **photos** (read via vision) all run through
-Core and get a reply; the bot acks instantly and keeps a "typing…" indicator alive while it
-works. The `notify` skill (and scheduled tasks) can message you too. The bridge is **locked to
-your chat id** — it ignores everyone else.
+Core and get a reply; the bot acks instantly, streams the answer in as it's written, and shows
+which tool/skill is running. The `notify` skill (and scheduled tasks) can message you too. The
+bridge is **locked to your chat id** — it ignores everyone else.
+
+Your chat is **one ongoing conversation** — Core remembers the prior turns (so follow-ups like
+"and what about tomorrow?" work), and it survives bot restarts. Send **`/new`** (or `/reset`)
+to clear the context and start fresh.
 
 ---
 
@@ -268,7 +275,9 @@ Adding a service, by case:
    API, so the token never enters the model's context. Most skills are this case.
 2. **A mature official CLI exists** (e.g. `gh`, `yt-dlp`, `ffmpeg`) → install it in
    **`core/Dockerfile`** (pinned) and rebuild once; the `SKILL.md` documents how to call it.
-   (`yt-dlp` is installed this way.)
+   Already baked in: **`yt-dlp`** (youtube), **`gh`** (github-pages), **`ffmpeg`** (voice), and
+   **`sonos`** (sonos — compiled from source in a multi-stage build, since upstream ships macOS
+   binaries only). These add little and are harmless if unused, so the image installs them all.
 
 Declare dependencies in `SKILL.md` frontmatter (OpenClaw-compatible):
 ```yaml
