@@ -24,6 +24,9 @@ services:
       - PI_CODING_AGENT_DIR=/app/.pi
       # Local timezone so scheduled "07:00" jobs fire at local time. Change as needed.
       - TZ=Europe/Berlin
+      # Sonos speaker IP for the `sonos` skill (set SONOS_HOST in .env). The bot gets this via
+      # its env_file; the scheduler/interactive core need it listed here.
+      - SONOS_HOST=${SONOS_HOST:-}
     # Run the scheduler as the main process: it keeps the container alive AND fires
     # scheduled jobs. Interactive use (`core.sh` → docker exec pi) runs alongside it.
     command: ["node", "/app/scheduler/scheduler.mjs"]

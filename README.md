@@ -147,6 +147,8 @@ Skills are on-demand capability packages ([Agent Skills standard](https://agents
 | `morning-briefing` | Dated greeting + unread email + today's calendar + weather + a joke. |
 | `todos` | Maintain the single `todos.md` checklist. |
 | `remember` | Save / recall / forget durable facts (Core's long-term memory — see below). |
+| `github-pages` | Publish a static site to GitHub Pages (create repo → push → enable Pages). Needs a PAT in `data/secrets/github_token`. |
+| `sonos` | Control a Sonos speaker — play / pause / volume / favorites / Spotify. Local network; set `SONOS_HOST` (the speaker IP) in `.env`. |
 
 > **Invoke skills with `/skill:<name>`** (or `./core.sh skill <name>`) for reliable execution.
 > pi uses *progressive disclosure*: only a skill's description is always in context; the full
