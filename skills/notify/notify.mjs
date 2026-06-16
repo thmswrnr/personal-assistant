@@ -17,12 +17,18 @@ const text = process.argv.slice(2).join(" ").trim();
 if (!text) die('usage: notify.mjs "message"');
 if (!TOKEN || !CHAT) die("Telegram not configured — set TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID in .env.");
 
-const res = await fetch(`https://api.telegram.org/bot${TOKEN}/sendMessage`, {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ chat_id: CHAT, text: text.slice(0, 4000) }),
-});
-if (!res.ok) die(`Telegram API ${res.status}: ${await res.text()}`);
-const j = await res.json();
-if (!j.ok) die(`Telegram error: ${JSON.stringify(j)}`);
+// Messages render in Telegram, which supports a small HTML subset — Core formats them as
+// HTML (see SKILL.md). Send with parse_mode HTML; if Telegram rejects the markup (e.g. an
+// unescaped < or &), retry once as plain text so the message still goes out.
+async function post(parseMode) {
+  const body = { chat_id: CHAT, text: text.slice(0, 4000) };
+  if (parseMode) body.parse_mode = parseMode;
+  const res = await fetch(`https://api.telegram.org/bot${TOKEN}/sendMessage`, {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+  });
+  return res.ok ? await res.json() : { ok: false, status: res.status, text: await res.text() };
+}
+let j = await post("HTML");
+if (!j.ok) j = await post(null); // HTML rejected → fall back to plain
+if (!j.ok) die(`Telegram error ${j.status}: ${j.text}`);
 console.log(JSON.stringify({ sent: true, chars: text.length }));

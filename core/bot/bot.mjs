@@ -7,7 +7,7 @@
 // them via the model's vision). Messages from any other chat are ignored (single-user lock).
 // Because the bridge can send messages, it's also the channel the `notify` skill uses.
 //
-// Responsiveness: each job posts a status message ("🤔 Working on it…") immediately and keeps
+// Responsiveness: each job posts a status message ("💭 Thinking…") immediately and keeps
 // the typing indicator alive, then EDITS that message into the final answer.
 //
 // Scheduling lives in Core (the scheduler service), NOT here — this is just a messenger.
@@ -21,6 +21,15 @@ const TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const ALLOWED = process.env.TELEGRAM_CHAT_ID ? String(process.env.TELEGRAM_CHAT_ID) : "";
 const MODEL = process.env.CORE_MODEL ?? "local/local-model";
 const EXT = "/app/.pi/extensions/context-saver.mjs";
+// Appended to Core's system prompt for bot runs only (the CLI stays plain markdown): the reply
+// is rendered in Telegram, which supports a small HTML subset. Keep this strict — invalid HTML
+// makes Telegram reject the message (we then fall back to plain, showing raw tags).
+const TG_FORMAT =
+  "OUTPUT FORMAT: your reply is shown in Telegram. Format it with ONLY these HTML tags: " +
+  "<b>bold</b>, <i>italic</i>, <u>underline</u>, <s>strike</s>, <code>inline code</code>, " +
+  "<pre>code block</pre>, <a href=\"url\">link</a>. Do NOT use Markdown (no **, ##, backticks, " +
+  "tables). Escape literal <, >, & as &lt; &gt; &amp; in normal text. No other tags (no <h1>, " +
+  "<ul>, <li>, <p>, <br>). For lists use lines starting with •. Keep replies concise.";
 const API = `https://api.telegram.org/bot${TOKEN}`;
 // The local model also handles audio (the projector includes an audio encoder), so voice
 // notes are transcribed by the main model — no separate STT service.
@@ -76,11 +85,22 @@ async function sendMsg(chatId, text) {
   }
 }
 
-// Edit a message (falls back to a fresh send if we have no message_id).
-async function editMsg(chatId, id, text) {
+// Edit a message (falls back to a fresh send if we have no message_id). `parseMode` (e.g.
+// "HTML") is optional; if an HTML edit is rejected (bad markup), we retry once as plain text
+// so a converter slip never leaves the user staring at a stuck "Working…" message.
+async function editMsg(chatId, id, text, parseMode) {
   if (!id) return void (await send(chatId, text));
-  try { await tg("editMessageText", { chat_id: chatId, message_id: id, text: (text || "(no output)").slice(0, 4096) }); }
-  catch (e) { log("edit error:", e.message); }
+  const t = (text || "(no output)").slice(0, 4096);
+  const payload = { chat_id: chatId, message_id: id, text: t };
+  if (parseMode) payload.parse_mode = parseMode;
+  try { await tg("editMessageText", payload); }
+  catch (e) {
+    if (parseMode) {
+      try { return void (await tg("editMessageText", { chat_id: chatId, message_id: id, text: t })); }
+      catch (e2) { return void log("edit error (plain retry):", e2.message); }
+    }
+    log("edit error:", e.message);
+  }
 }
 
 // Plain send, chunked to Telegram's 4096-char limit.
@@ -92,12 +112,27 @@ async function send(chatId, text) {
   }
 }
 
-// Turn the status message into the answer; spill overflow to follow-up messages.
-async function editOrSend(chatId, id, text) {
+// Turn the status message into the final answer; spill overflow to follow-up messages.
+// Core already formats its reply as Telegram HTML (see the bot's appended system prompt), so
+// `parseMode` is just passed through — no conversion here. Overflow is split on a newline
+// boundary so an HTML tag is never cut in two. editMsg falls back to plain on an HTML error.
+async function editOrSend(chatId, id, text, parseMode) {
   text = text || "(no output)";
-  if (!id || text.length <= 4096) return void (await editMsg(chatId, id, text));
-  await editMsg(chatId, id, text.slice(0, 4096));
-  for (let i = 4096; i < text.length; i += 4000) await send(chatId, text.slice(i, i + 4000));
+  if (text.length <= 4096) return void (await editMsg(chatId, id, text, parseMode));
+  const pieces = [];
+  let rest = text;
+  while (rest.length > 4000) {
+    let cut = rest.lastIndexOf("\n", 4000);
+    if (cut < 2000) cut = 4000;
+    pieces.push(rest.slice(0, cut));
+    rest = rest.slice(cut).replace(/^\n+/, "");
+  }
+  if (rest) pieces.push(rest);
+  await editMsg(chatId, id, pieces[0], parseMode);
+  for (let i = 1; i < pieces.length; i++) {
+    try { await tg("sendMessage", { chat_id: chatId, text: pieces[i], ...(parseMode ? { parse_mode: parseMode } : {}) }); }
+    catch (e) { log("send error:", e.message); }
+  }
 }
 
 // Keep the "typing…" indicator alive (Telegram's expires after ~5s). Returns a stop fn.
@@ -122,15 +157,15 @@ async function downloadTgFile(fileId, base) {
 
 // ---- agent run (streaming) ----
 // Run a prompt through Core in JSON event mode and stream the assistant's answer out via
-// callbacks, so the Telegram message can update live as text arrives. We forward only
-// `text_delta` (the answer) — `thinking_delta` (reasoning) is deliberately ignored — plus
-// tool start/end so the UI can show "🔧 …". imagePath (optional) is attached as a `@file`
+// callbacks, so the Telegram message can update live as text arrives. We forward `text_delta`
+// (the answer) and `thinking_delta` (reasoning, shown collapsed in the live process log) plus
+// tool start/end so the UI can show the trail. imagePath (optional) is attached as a `@file`
 // positional so the model sees the image. stdin ignored (an open stdin pipe makes pi hang
 // forever); detached → own process group so the timeout can kill the whole tree.
 function runAgent(prompt, imagePath, handlers = {}, sessionId) {
   return new Promise((resolve) => {
     const head = sessionId ? ["--mode", "json", "--session-id", sessionId] : ["--mode", "json"];
-    const tail = ["--model", MODEL, "-e", EXT];
+    const tail = ["--model", MODEL, "-e", EXT, "--append-system-prompt", TG_FORMAT];
     const args = imagePath ? [...head, `@${imagePath}`, prompt, ...tail] : [...head, prompt, ...tail];
     const p = spawn("pi", args, { cwd: "/app", detached: true, stdio: ["ignore", "pipe", "pipe"] });
     let err = "", buf = "", done = false;
@@ -151,6 +186,7 @@ function runAgent(prompt, imagePath, handlers = {}, sessionId) {
         try {
           if (ev.type === "message_start" && ev.message?.role === "assistant") handlers.onAssistantStart?.();
           else if (ev.type === "message_update" && ev.assistantMessageEvent?.type === "text_delta") handlers.onDelta?.(ev.assistantMessageEvent.delta || "");
+          else if (ev.type === "message_update" && ev.assistantMessageEvent?.type === "thinking_delta") handlers.onThinking?.(ev.assistantMessageEvent.delta || "");
           else if (ev.type === "tool_execution_start") handlers.onTool?.(ev.toolName, ev.args);
           else if (ev.type === "tool_execution_end") handlers.onToolEnd?.();
         } catch { /* a handler throwing must not break the stream */ }
@@ -243,7 +279,7 @@ async function enqueue(chatId, job) {
         if (!heard) { await editMsg(j.chatId, statusId, "🎤 Sorry — couldn't transcribe that. Try again, or send text."); continue; }
         log(`transcribed: ${heard.slice(0, 80)}`);
         await editMsg(j.chatId, statusId, `🎤 “${heard}”`); // heard echo stays visible
-        statusId = await sendMsg(j.chatId, "🤔 Working on it…");
+        statusId = await sendMsg(j.chatId, "💭 Thinking…");
         prompt = heard;
       } else if (j.photoFileId) {
         statusId = await sendMsg(j.chatId, "🖼️ Looking at the image…");
@@ -251,40 +287,34 @@ async function enqueue(chatId, job) {
         if (!imagePath) { await editMsg(j.chatId, statusId, "🖼️ Sorry — couldn't fetch that image."); continue; }
         prompt = j.caption?.trim() || IMAGE_PROMPT;
       } else {
-        statusId = await sendMsg(j.chatId, "🤔 Working on it…");
+        statusId = await sendMsg(j.chatId, "💭 Thinking…");
       }
       const t0 = process.hrtime.bigint();
-      // Live: accumulate the current assistant message's text plus a transient tool line, and
-      // edit the status message as it streams in (throttled to stay under Telegram's edit rate).
-      let answer = "", tool = "", lastShown = "", lastEdit = 0;
-      const view = () => {
-        const t = answer.trimStart();
-        const body = tool ? `${t ? t + "\n\n" : ""}🔧 ${tool}…` : t;
-        return body || "🤔 Working on it…";
-      };
+      // Live: ONE message showing a short, stable status — "💭 Thinking…" while the model
+      // reasons or writes, "🔧 <tool>…" while a tool runs — then replaced by the final answer.
+      // Status stays short (no streaming content) so the message doesn't jar between long and
+      // short. The answer is just accumulated; Core formats it as Telegram HTML itself.
+      let answer = "", current = "💭 Thinking…", lastShown = "", lastEdit = 0;
       const render = async (force) => {
         const now = Date.now();
-        // Throttle repaints: Telegram has no real token stream — each update is an
-        // editMessageText call and is rate-limited, so we repaint at most every ~800ms
-        // (smaller/more frequent chunks than before, still clear of 429s; a dropped edit just
-        // merges into the next repaint). True per-token streaming isn't possible here.
+        // Throttle repaints to stay under Telegram's edit rate (~800ms).
         if (!force && now - lastEdit < 800) return;
-        const text = view();
-        if (text === lastShown) return;
-        lastShown = text; lastEdit = now;
-        await editMsg(j.chatId, statusId, text.length > 4096 ? text.slice(0, 4090) + "…" : text);
+        if (current === lastShown) return;
+        lastShown = current; lastEdit = now;
+        await editMsg(j.chatId, statusId, current);
       };
       const sessionId = sessionIdFor(j.chatId); // resume this chat's conversation (bounded; see top)
       const r = await runAgent(prompt, imagePath, {
-        onAssistantStart: () => { answer = ""; },         // show only the latest message's text
-        onDelta: (d) => { answer += d; render(false); },
-        onTool: (name, args) => { tool = toolStatus(name, args); render(true); },
-        onToolEnd: () => { tool = ""; },
+        onAssistantStart: () => { answer = ""; },
+        onThinking: () => { current = "💭 Thinking…"; render(false); },
+        onDelta: (d) => { answer += d; current = "💭 Thinking…"; render(false); }, // accumulate; status stays generic
+        onTool: (name, args) => { current = `🔧 ${toolStatus(name, args)}…`; render(true); },
+        onToolEnd: () => { current = "💭 Thinking…"; },
       }, sessionId);
       const secs = Number(process.hrtime.bigint() - t0) / 1e9;
       const reply = answer.trim() || (r.code === 0 ? "(no output)" : `⚠️ agent error: ${r.err || "failed"}`);
       log(`run done in ${secs.toFixed(0)}s: exit=${r.code} out=${reply.length}ch${r.err ? ` err=${r.err.slice(0, 80)}` : ""}`);
-      await editOrSend(j.chatId, statusId, reply); // final, clean answer (handles >4096 chunking)
+      await editOrSend(j.chatId, statusId, reply, "HTML"); // final answer (Core formats it as Telegram HTML)
       log(`replied (${reply.length}ch)`);
     } catch (e) {
       log(`job error: ${e?.message ?? e}`);

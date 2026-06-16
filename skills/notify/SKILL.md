@@ -30,6 +30,14 @@ node /app/.pi/skills/notify/send-file.mjs "/app/storage/notes/report.md" "your d
 Both print `{"sent":true,...}` on success. The file is sent as a Telegram document (max
 50 MB), so it arrives downloadable and lossless regardless of type.
 
+## Formatting (Telegram HTML)
+
+The message renders in Telegram. Format it with ONLY these HTML tags: `<b>bold</b>`,
+`<i>italic</i>`, `<u>`, `<s>`, `<code>inline</code>`, `<pre>block</pre>`,
+`<a href="url">link</a>`. Do **not** use Markdown (no `**`, `#`, backticks). Escape literal
+`<`, `>`, `&` as `&lt; &gt; &amp;`. No other tags. For lists, use lines starting with `•`.
+Plain text with no tags is fine too.
+
 ## How to use it
 
 1. Use it when the user asks to be notified/reminded, or to deliver the result of a task
