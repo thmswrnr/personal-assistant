@@ -160,6 +160,7 @@ Skills are on-demand capability packages ([Agent Skills standard](https://agents
 | `morning-briefing` | Dated greeting + unread email + today's calendar + weather + a joke. |
 | `todos` | Manage your main to-do list, backed by **Google Tasks** (syncs to the Google Tasks app + Gmail/Calendar side panel) — add / list / complete, due dates, multiple lists. |
 | `project-planning` | Break any task/problem into a structured plan; saves real projects to their own `storage/projects/<slug>/` folder (`plan.md` + a plain-markdown `todos.md`). |
+| `haushaltsbuch` | Log expenses to your `haushaltsbuch<year>` Google Sheet — classifies receipt items by category, sums per category, appends one row per category to the "Variable Ausgaben" tab. Markdown-only skill on top of `sheets`. |
 | `remember` | Save / recall / forget durable facts (Core's long-term memory — see below). |
 | `github-pages` | Publish a static site to GitHub Pages (create repo → push → enable Pages). Needs a PAT in `data/secrets/github_token`. |
 | `sonos` | Control a Sonos speaker — play / pause / volume / favorites. Local network; set `SONOS_HOST` (the speaker IP) in `.env`. |
