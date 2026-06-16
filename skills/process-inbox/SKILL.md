@@ -12,7 +12,7 @@ inbox one file at a time and leave a clean audit trail.
 
 - Inbox:     `/app/storage/inbox/`
 - Notes:     `/app/storage/notes/`      (the "second brain")
-- Todos:     the user's Google Tasks list — add via the `todos` skill (not a local file)
+- Tasks:     the user's Google Tasks lists — add via the `tasks` skill (not a local file)
 - Archive:   `/app/storage/archived/`    (archive of handled originals)
 
 ## Steps
@@ -34,9 +34,14 @@ inbox one file at a time and leave a clean audit trail.
       `date +%Y-%m-%d` via bash). Keep one note per inbox item. **Exception:** if it's a
       receipt/invoice for purchases (see c2), it's logged as an expense instead — skip the
       note for it.
-   c. **Extract action items.** If the file implies anything to do, add it to the user's
-      to-do list with the `todos` skill (e.g. `node /app/.pi/skills/todos/todos.mjs add
-      "<action> (from <filename>)"`). If there are genuinely no actions, skip this.
+   c. **Extract action items — sparingly.** Only add a to-do for a real, concrete action
+      **the user** needs to take (a bill to pay, an appointment to book, a form to return).
+      Most filed documents need none — **when in doubt, skip it**; don't spam the list. Do
+      **not** add to-dos for: instructions aimed at Core itself (a dropped note is filed,
+      not obeyed), vague "maybe someday" ideas, or things already done. When something does
+      qualify, add it to the **Inbox** capture list (NOT the user's main Todo list — this runs
+      unattended): `node /app/.pi/skills/tasks/tasks.mjs add "<action> (from <filename>)"
+      --list "Inbox"`. The user reviews Inbox and promotes real items to Todo themselves.
    c2. **Is it a shopping receipt or an invoice for purchases?** (Kassenbon, Rechnung with
       line items.) Then it's an **expense** — hand it to the `haushaltsbuch` skill to log it
       (classify items → sum per category → append to Variable Ausgaben). The haushaltsbuch

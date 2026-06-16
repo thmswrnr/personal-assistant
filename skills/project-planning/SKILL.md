@@ -61,7 +61,7 @@ checklist, kept deliberately simple (no priorities, due dates, or tags):
 ```
 
 Mark items `- [x]` as they're done. This is separate from the user's general to-do list (the
-`todos` skill) — project tasks stay here in the project folder.
+`tasks` skill) — project tasks stay here in the project folder.
 
 Other project files (notes, drafts, research) can live in the same `projects/$slug/` folder.
 
@@ -74,6 +74,6 @@ Other project files (notes, drafts, research) can live in the same `projects/$sl
 
 ## Rules
 - **Don't pollute the user's general to-do list** with project tasks — each project keeps its
-  own `todos.md` (the `todos` skill manages the general list).
+  own `todos.md` (the `tasks` skill manages the general list).
 - Match effort to the ask: a quick question gets a quick structured answer, not a folder.
 - Keep project todos plain: a simple `- [ ]` Markdown checklist — no priorities, dates, or tags.

@@ -160,7 +160,7 @@ Skills are on-demand capability packages ([Agent Skills standard](https://agents
 | `schedule` | Manage recurring jobs (list / add / remove cron jobs). |
 | `process-inbox` | Read each file in `inbox/` (incl. **images** via vision) → note + todos → archive. |
 | `morning-briefing` | Dated greeting + unread email + today's calendar + weather + a joke. |
-| `todos` | Manage your main to-do list, backed by **Google Tasks** (syncs to the Google Tasks app + Gmail/Calendar side panel) — add / list / complete, due dates, multiple lists. |
+| `tasks` | Multi-list task manager backed by **Google Tasks** (syncs to the Google Tasks app + Gmail/Calendar side panel) — routes by intent across your lists (Todo, Einkaufsliste/shopping, Inbox/capture); add / list / complete, due dates. |
 | `project-planning` | Break any task/problem into a structured plan; saves real projects to their own `storage/projects/<slug>/` folder (`plan.md` + a plain-markdown `todos.md`). |
 | `haushaltsbuch` | Log expenses to your `haushaltsbuch<year>` Google Sheet — classifies receipt items by category, sums per category, appends one row per category to the "Variable Ausgaben" tab. Markdown-only skill on top of `sheets`. |
 | `skill-builder` | Lets Core author or modify its **own** skills — only on explicit request, shown for approval before writing, into the writable `custom_skills/` area (curated skills stay read-only). |

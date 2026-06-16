@@ -1,14 +1,15 @@
 #!/usr/bin/env node
-// Google Tasks CLI for Core — the user's general to-do list. Backed by Google Tasks, so it
-// syncs with the Google Tasks app and the Gmail/Calendar side panel. Uses the Tasks v1 API
-// with the shared Google OAuth refresh token. No third-party deps (Node built-in fetch).
+// Google Tasks CLI for Core — manages the user's task lists (Todo, shopping, Inbox, …).
+// Backed by Google Tasks, so it syncs with the Google Tasks app and the Gmail/Calendar side
+// panel. Uses the Tasks v1 API with the shared Google OAuth refresh token. No third-party
+// deps (Node built-in fetch).
 //
 // Commands:
-//   node todos.mjs list [--all] [--list "<name>"]            # open tasks, numbered (--all: incl. done)
-//   node todos.mjs add "<title>" [--due YYYY-MM-DD] [--notes "..."] [--list "<name>"]
-//   node todos.mjs done <n|id> [--list "<name>"]             # complete a task
-//   node todos.mjs rm   <n|id> [--list "<name>"]             # delete a task
-//   node todos.mjs lists                                     # show all task lists
+//   node tasks.mjs list [--all] [--list "<name>"]            # open tasks, numbered (--all: incl. done)
+//   node tasks.mjs add "<title>" [--due YYYY-MM-DD] [--notes "..."] [--list "<name>"]
+//   node tasks.mjs done <n|id> [--list "<name>"]             # complete a task
+//   node tasks.mjs rm   <n|id> [--list "<name>"]             # delete a task
+//   node tasks.mjs lists                                     # show all task lists
 //
 // <n> is the number shown by `list`. Targets the default list unless --list is given.
 import { readFileSync } from "node:fs";
@@ -80,7 +81,7 @@ async function resolveList(token, name) {
   const j = await api("/users/@me/lists", token);
   const want = String(name).toLowerCase();
   const hit = (j.items ?? []).find((l) => l.title.toLowerCase().includes(want));
-  if (!hit) die(`no task list matching "${name}" (try: todos.mjs lists)`);
+  if (!hit) die(`no task list matching "${name}" (try: tasks.mjs lists)`);
   return hit.id;
 }
 
@@ -96,7 +97,7 @@ async function resolveTaskId(token, listId, ref) {
   if (!/^\d+$/.test(ref)) return ref; // already a task id
   const tasks = await openTasks(token, listId);
   const idx = parseInt(ref, 10) - 1;
-  if (idx < 0 || idx >= tasks.length) die(`no open task #${ref} (run: todos.mjs list)`);
+  if (idx < 0 || idx >= tasks.length) die(`no open task #${ref} (run: tasks.mjs list)`);
   return tasks[idx].id;
 }
 
@@ -126,7 +127,7 @@ if (cmd === "lists") {
   console.log(JSON.stringify(result, null, 2));
 } else if (cmd === "add") {
   const title = f._[1];
-  if (!title) die('usage: todos.mjs add "<title>" [--due YYYY-MM-DD] [--notes "..."] [--list "<name>"]');
+  if (!title) die('usage: tasks.mjs add "<title>" [--due YYYY-MM-DD] [--notes "..."] [--list "<name>"]');
   const listId = await resolveList(token, f.list);
   const body = { title };
   if (f.notes && f.notes !== true) body.notes = f.notes;
@@ -138,7 +139,7 @@ if (cmd === "lists") {
   console.log(JSON.stringify({ added: t.title, due: dateOnly(t.due), id: t.id }, null, 2));
 } else if (cmd === "done") {
   const ref = f._[1];
-  if (!ref) die("usage: todos.mjs done <n|id> [--list \"<name>\"]");
+  if (!ref) die("usage: tasks.mjs done <n|id> [--list \"<name>\"]");
   const listId = await resolveList(token, f.list);
   const id = await resolveTaskId(token, listId, ref);
   const t = await api(`/lists/${encodeURIComponent(listId)}/tasks/${encodeURIComponent(id)}`, token, {
@@ -148,7 +149,7 @@ if (cmd === "lists") {
   console.log(JSON.stringify({ completed: t.title }, null, 2));
 } else if (cmd === "rm") {
   const ref = f._[1];
-  if (!ref) die("usage: todos.mjs rm <n|id> [--list \"<name>\"]");
+  if (!ref) die("usage: tasks.mjs rm <n|id> [--list \"<name>\"]");
   const listId = await resolveList(token, f.list);
   const id = await resolveTaskId(token, listId, ref);
   await api(`/lists/${encodeURIComponent(listId)}/tasks/${encodeURIComponent(id)}`, token, { method: "DELETE" });
