@@ -118,6 +118,21 @@ fi
 
 # ── 6. Build & start ──────────────────────────────────────────────────────────────────
 bold "6/6  Build & start"
+
+# Self-written skills: ensure the writable skills area exists and is loaded by pi.
+# (settings.json + data/storage are gitignored runtime state, so wire them here.)
+mkdir -p data/storage/custom_skills
+SETTINGS=data/pi/settings.json
+if command -v node >/dev/null 2>&1; then
+  node -e 'const fs=require("fs"),f=process.argv[1];let j={};try{j=JSON.parse(fs.readFileSync(f,"utf8"))}catch{}
+j.skills=Array.from(new Set([...(j.skills||[]),"/app/storage/custom_skills"]));
+fs.writeFileSync(f,JSON.stringify(j,null,2)+"\n")' "$SETTINGS" && ok "custom_skills wired into pi settings"
+elif [ ! -f "$SETTINGS" ]; then
+  printf '{\n  "skills": ["/app/storage/custom_skills"]\n}\n' > "$SETTINGS"; ok "custom_skills wired (new settings.json)"
+else
+  grep -q custom_skills "$SETTINGS" || warn "Add \"/app/storage/custom_skills\" to the \"skills\" array in $SETTINGS to enable self-written skills."
+fi
+
 PROFILE=(); [ "$USE_TELEGRAM" = yes ] && PROFILE=(--profile telegram)
 if yesno "Build the image and start the stack now?" y; then
   $DC "${PROFILE[@]}" up -d --build

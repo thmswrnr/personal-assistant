@@ -123,7 +123,7 @@ Stop: `docker compose down`.
 | Host path | In `core` | Purpose |
 |---|---|---|
 | `data/pi/` | `/app/.pi` | pi config: `models.json`, `SYSTEM.md`, `extensions/`, plus pi runtime (`sessions/`, …) |
-| `data/storage/` | `/app/storage` | your files: `inbox/`, `notes/` (the second brain), `processed/`, `projects/` (per-project `plan.md` + `todos.md`), `schedule.json`, `memory/` (long-term facts). The main to-do list lives in Google Tasks, not here. |
+| `data/storage/` | `/app/storage` | your files: `inbox/`, `notes/` (the second brain), `processed/`, `projects/` (per-project `plan.md` + `todos.md`), `schedule.json`, `memory/` (long-term facts), `custom_skills/` (Core's own writable skills — see `skill-builder`). The main to-do list lives in Google Tasks, not here. |
 | `data/secrets/` | `/app/secrets` | OAuth creds / tokens (git-ignored) |
 | `data/models/` | `/models` (in `llm`) | the GGUF model files |
 | `skills/` | `/app/.pi/skills` | `SKILL.md` capability packages (version-controlled) |
@@ -161,6 +161,7 @@ Skills are on-demand capability packages ([Agent Skills standard](https://agents
 | `todos` | Manage your main to-do list, backed by **Google Tasks** (syncs to the Google Tasks app + Gmail/Calendar side panel) — add / list / complete, due dates, multiple lists. |
 | `project-planning` | Break any task/problem into a structured plan; saves real projects to their own `storage/projects/<slug>/` folder (`plan.md` + a plain-markdown `todos.md`). |
 | `haushaltsbuch` | Log expenses to your `haushaltsbuch<year>` Google Sheet — classifies receipt items by category, sums per category, appends one row per category to the "Variable Ausgaben" tab. Markdown-only skill on top of `sheets`. |
+| `skill-builder` | Lets Core author or modify its **own** skills — only on explicit request, shown for approval before writing, into the writable `custom_skills/` area (curated skills stay read-only). |
 | `remember` | Save / recall / forget durable facts (Core's long-term memory — see below). |
 | `github-pages` | Publish a static site to GitHub Pages (create repo → push → enable Pages). Needs a PAT in `data/secrets/github_token`. |
 | `sonos` | Control a Sonos speaker — play / pause / volume / favorites. Local network; set `SONOS_HOST` (the speaker IP) in `.env`. |
