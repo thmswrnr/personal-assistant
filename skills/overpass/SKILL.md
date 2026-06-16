@@ -31,17 +31,13 @@ $O presets                                           # list the amenity words it
   `"amenity=cafe"`.
 - **`--radius`** metres (default 1500, max 10000) · **`--limit`** results (default 15, max 50).
   Keep the radius modest — it's faster and kinder to the public API.
-- Output is JSON: the resolved `center`, a **`mapAll`** link, then `results` sorted **nearest
-  first**, each with `name`, `kind`, `distanceMeters`, `address`, `opening_hours`, `phone`,
-  `website`, coords, a per-pin **`map`** link, and the `osm` id.
-- **Which link to give:**
-  - For **one place** (e.g. "the closest bank") → give that result's per-pin **`map`** link
-    (`maps?q=lat,lon`) — a Google Maps pin at the exact spot, nothing else.
-  - To show **several on one map** → give the top-level **`mapAll`** link. It plots *exactly the
-    returned results* as pins (it's a geojson.io map, not a Google search — so it won't show
-    other/unrelated places).
-- Then summarize the top few in text (name, distance, hours). Paste links **verbatim** — don't
-  reformat, wrap, or shorten them.
+- Output is JSON: the resolved `center`, then `results` sorted **nearest first**, each with
+  `name`, `kind`, `distanceMeters`, `address`, `opening_hours`, `phone`, `website`, `lat`/`lon`,
+  and the `osm` id. Summarize the top few for the user (name, distance, hours).
+- **To put the places on a map, use the `google-maps` skill** — hand it the result coordinates
+  (and, when the user referenced a place like home, that location to highlight). This skill only
+  *finds* the places; `google-maps` turns coordinates into a link/map. Show a map when the user
+  wants to see *where* things are; skip it for "how far"/"how many"/"what's the closest" answers.
 
 ## Good to know
 - Data is community OpenStreetMap — usually good in cities, but `opening_hours`/`phone` may be
