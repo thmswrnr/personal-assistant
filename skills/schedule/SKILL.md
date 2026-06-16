@@ -1,6 +1,6 @@
 ---
 name: schedule
-description: Manage Core's scheduled/recurring JOBS — work Core itself runs automatically at set times (a daily briefing, an hourly check, a weekly report). Use when the user wants Core to DO something on a schedule: "every morning…", "run X daily/hourly/weekdays at…", "schedule a job to…", "what's scheduled", "stop the … job". NOT for the user's own reminders/to-dos — "remind me to <do a thing myself>" (even "in 1 hour") goes to the `todos` skill (Google Tasks). Each job runs a Core prompt on a cron schedule.
+description: Manage Core's scheduled/recurring JOBS — work Core itself runs automatically at set times (a daily briefing, an hourly check, a weekly report). Use when the user wants Core to DO something on a schedule — "every morning…", "run X daily/hourly/weekdays at…", "schedule a job to…", "what's scheduled", "stop the … job". NOT for the user's own reminders/to-dos — "remind me to <do a thing myself>" (even "in 1 hour") goes to the `todos` skill (Google Tasks). Each job runs a Core prompt on a cron schedule.
 metadata:
   {
     "core":

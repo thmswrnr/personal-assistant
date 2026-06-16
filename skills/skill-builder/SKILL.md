@@ -39,6 +39,11 @@ skills are picked up on the **next** Core session (skills are scanned at startup
    - `description`: specific — say what it does *and when to use it* (this is what makes Core
      pick it). Optional `metadata: { "core": { "requires": { "bins": [...], "env": [...],
      "files": [...] } } }` listing what it needs.
+     - **YAML gotcha:** keep `description` on one line and **avoid a raw colon-then-space (`: `)
+       inside it** — YAML reads that as a nested key and the skill fails to load. Use a dash or
+       comma instead (use em-dashes/quotes freely; just not `: `).
+   - **Don't put a stray `.md` file at the root of `custom_skills/`** — pi treats any root `*.md`
+     in a skills folder as a skill. Each skill is its own subfolder `custom_skills/<name>/SKILL.md`.
    - Body: clear steps, with runnable `bash` blocks. If it needs a script, draft that too.
 3. **Show the user the full `SKILL.md` (and any script) and get explicit approval BEFORE
    writing anything.** Never write-and-run silently.
