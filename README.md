@@ -145,7 +145,9 @@ Skills are on-demand capability packages ([Agent Skills standard](https://agents
 |---|---|
 | `gmail` | Read email (search / read / labels) **and create drafts** — never sends. Gmail API. |
 | `drive` | Read Google Drive (list / search / read; Docs→text, Sheets→CSV). Read-only. |
-| `calendar` | Google Calendar (list / agenda / today / search). Read-only. |
+| `calendar` | Google Calendar — list / agenda / today / search, **and create / edit / delete events** (confirms before writing). |
+| `sheets` | Google Sheets — create a spreadsheet, read a range, append rows, overwrite cells. Confirms before writing. |
+| `docs` | Google Docs — create a doc, read its text, append text. Confirms before writing. |
 | `youtube` | Video transcripts (summarize any video) + your subscriptions & new-videos feed. |
 | `weather` | Current conditions + forecast via Open-Meteo (no API key). |
 | `transit` | German public-transport / Deutsche Bahn connections, departures, delays & platforms via the free transport.rest DB API (no key). |
