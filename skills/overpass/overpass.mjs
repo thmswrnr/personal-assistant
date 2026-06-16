@@ -168,15 +168,22 @@ async function near() {
       website: tags.website || tags["contact:website"] || null,
       lat: p.lat ?? null,
       lon: p.lon ?? null,
-      map: p.lat != null ? `https://www.google.com/maps/search/?api=1&query=${p.lat},${p.lon}` : null,
+      map: p.lat != null ? `https://www.google.com/maps?q=${p.lat},${p.lon}` : null,
       osm: `${e.type}/${e.id}`,
     };
   });
   elems.sort((a, b) => (a.distanceMeters ?? 1e12) - (b.distanceMeters ?? 1e12));
 
+  // One Google Maps link that shows ALL nearby matches as pins, centered on the search point.
+  // Path form (no query string) so it survives markdown/Telegram rendering intact.
+  const term = amenity.includes("=") ? amenity.split("=")[1] : amenity;
+  const zoom = Math.max(11, Math.min(17, Math.round(15 - Math.log2(Math.max(radius, 300) / 1000))));
+  const mapAll = `https://www.google.com/maps/search/${encodeURIComponent(term)}/@${center.lat},${center.lon},${zoom}z`;
+
   console.log(JSON.stringify({
     query: { amenity, filters, radiusMeters: radius },
     center: { lat: center.lat, lon: center.lon, name: center.name },
+    mapAll,
     count: elems.length,
     results: elems.slice(0, limit),
   }, null, 2));

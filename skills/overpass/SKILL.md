@@ -31,11 +31,14 @@ $O presets                                           # list the amenity words it
   `"amenity=cafe"`.
 - **`--radius`** metres (default 1500, max 10000) · **`--limit`** results (default 15, max 50).
   Keep the radius modest — it's faster and kinder to the public API.
-- Output is JSON: the resolved `center`, then `results` sorted **nearest first**, each with
-  `name`, `kind`, `distanceMeters`, `address`, `opening_hours`, `phone`, `website`, coords, a
-  ready-to-open **`map`** link, and the `osm` id. Summarize the top few for the user (name,
-  distance, hours) rather than dumping it — **and always include each one's `map` link** so the
-  user can actually see/open it.
+- Output is JSON: the resolved `center`, a **`mapAll`** link, then `results` sorted **nearest
+  first**, each with `name`, `kind`, `distanceMeters`, `address`, `opening_hours`, `phone`,
+  `website`, coords, a per-pin **`map`** link, and the `osm` id.
+- **Always give the user the single `mapAll` link** — it opens Google Maps showing *all* the
+  nearby matches as pins on one map (that's usually what they want). Then summarize the top few in
+  text (name, distance, hours). Add an individual result's `map` link only if they ask about one
+  specific place. Paste the links **verbatim** (they're plain, no query string — don't reformat
+  or wrap them).
 
 ## Good to know
 - Data is community OpenStreetMap — usually good in cities, but `opening_hours`/`phone` may be
