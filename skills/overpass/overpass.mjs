@@ -173,19 +173,28 @@ async function near() {
     };
   });
   elems.sort((a, b) => (a.distanceMeters ?? 1e12) - (b.distanceMeters ?? 1e12));
+  const shown = elems.slice(0, limit);
 
-  // One Google Maps link that shows ALL nearby matches as pins, centered on the search point.
-  // Path form (no query string) so it survives markdown/Telegram rendering intact.
-  const term = amenity.includes("=") ? amenity.split("=")[1] : amenity;
-  const zoom = Math.max(11, Math.min(17, Math.round(15 - Math.log2(Math.max(radius, 300) / 1000))));
-  const mapAll = `https://www.google.com/maps/search/${encodeURIComponent(term)}/@${center.lat},${center.lon},${zoom}z`;
+  // A single map of EXACTLY these results (not a re-search). Google Maps has no URL for
+  // dropping your own set of pins, so we render the precise points via geojson.io.
+  const geo = {
+    type: "FeatureCollection",
+    features: shown
+      .filter((r) => r.lat != null)
+      .map((r) => ({
+        type: "Feature",
+        properties: { name: r.name || r.kind || "result", distance_m: r.distanceMeters, address: r.address || undefined },
+        geometry: { type: "Point", coordinates: [r.lon, r.lat] },
+      })),
+  };
+  const mapAll = "https://geojson.io/#data=data:application/json," + encodeURIComponent(JSON.stringify(geo));
 
   console.log(JSON.stringify({
     query: { amenity, filters, radiusMeters: radius },
     center: { lat: center.lat, lon: center.lon, name: center.name },
     mapAll,
     count: elems.length,
-    results: elems.slice(0, limit),
+    results: shown,
   }, null, 2));
 }
 

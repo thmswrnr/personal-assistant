@@ -34,11 +34,14 @@ $O presets                                           # list the amenity words it
 - Output is JSON: the resolved `center`, a **`mapAll`** link, then `results` sorted **nearest
   first**, each with `name`, `kind`, `distanceMeters`, `address`, `opening_hours`, `phone`,
   `website`, coords, a per-pin **`map`** link, and the `osm` id.
-- **Always give the user the single `mapAll` link** — it opens Google Maps showing *all* the
-  nearby matches as pins on one map (that's usually what they want). Then summarize the top few in
-  text (name, distance, hours). Add an individual result's `map` link only if they ask about one
-  specific place. Paste the links **verbatim** (they're plain, no query string — don't reformat
-  or wrap them).
+- **Which link to give:**
+  - For **one place** (e.g. "the closest bank") → give that result's per-pin **`map`** link
+    (`maps?q=lat,lon`) — a Google Maps pin at the exact spot, nothing else.
+  - To show **several on one map** → give the top-level **`mapAll`** link. It plots *exactly the
+    returned results* as pins (it's a geojson.io map, not a Google search — so it won't show
+    other/unrelated places).
+- Then summarize the top few in text (name, distance, hours). Paste links **verbatim** — don't
+  reformat, wrap, or shorten them.
 
 ## Good to know
 - Data is community OpenStreetMap — usually good in cities, but `opening_hours`/`phone` may be
