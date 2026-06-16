@@ -28,9 +28,12 @@ You only ever **append rows to `Variable Ausgaben`**. Everything else is the use
 - **Betrag** — German currency `12,45 €` (comma decimal, a space, then `€`). The sheet is in
   German locale, so this parses to a real number — match this format exactly.
 - **Kategorie** — must match a name from the **Kategorien** tab exactly (it feeds a dropdown).
-  When the user's wording doesn't obviously map to a category, **`read` Kategorien `A:B`** and
-  use the **column-B descriptions** to decide which category an item belongs to. If nothing
-  fits, use **`Sonstiges`** (or ask). Don't invent a category that isn't in the list.
+  Classify **each item on its own** against the **Kategorien** list (**`read` Kategorien `A:B`**,
+  use the column-B descriptions). **Don't guess, and don't default a whole receipt to one
+  category** — most receipts span several. **When you can't tell what an item is** (cryptic
+  receipt abbreviation, unknown brand), do **one** `websearch` to identify it, then classify;
+  if it's *still* unclear, **ask the user** — never assign a category you're unsure of. Use
+  **`Sonstiges`** only for things that genuinely fit nothing. Don't invent a category.
 - **Notiz** — **use it.** By default put the **shop name** here (e.g. `Rewe`, `dm`, `Aldi`).
   Add a short extra detail if the user mentions one (`Rewe — Geburtstagsgeschenk`).
 
@@ -42,7 +45,10 @@ Receipts often arrive as an **image** — sent on the fly via Telegram, or dropp
 1. **Read the image.** Pull out: the **shop name** (header), the **date** (German receipts use
    `DD.MM.YYYY` or `DD.MM.YY` — use the receipt's date, not today, unless it's unreadable), the
    **line items** with their prices, and the printed **total** (Summe/Gesamt).
-2. **Classify + sum** the line items by category exactly as above (read `Kategorien!A:B`).
+2. **Classify each item, then sum by category** (read `Kategorien!A:B`). A supermarket receipt
+   normally spans **several categories** (food, drinks, household, Drogerie, …) — classify items
+   **individually**; **never lump the whole receipt into `Lebensmittel`** just because it's a
+   supermarket. If an item is unclear, one `websearch` or ask (see **Kategorie** above) — don't guess.
 3. **Reconcile.** Your per-category sums should add up to the receipt's printed total. If they
    don't, something was misread or there's a Pfand/discount/deposit line — say so and check with
    the user rather than forcing it.
@@ -51,6 +57,11 @@ Receipts often arrive as an **image** — sent on the fly via Telegram, or dropp
    quick OK before writing.
 
 If an amount or the date is genuinely unreadable, ask — don't guess at money.
+
+**Handling a correction.** If the user says an item belongs to a different category, move **only
+that one item**: subtract its amount from its old category's row and add it to the new category's
+row — every other item stays put. Then re-show the updated per-category breakdown. **Never collapse
+the whole receipt into the corrected category** — a correction touches one item, not the trip.
 
 ## Grouping — one row per category, per shopping trip
 
