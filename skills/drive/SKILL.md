@@ -3,7 +3,7 @@ name: drive
 description: Read the user's Google Drive (cloud storage) — list and search files/folders and read the text of Google Docs, Sheets, and plain-text files. Use for "find my … doc in Drive", "what's in my Drive", "read the … spreadsheet", "search my files for …". Read-only. (Google Drive cloud — distinct from the local files inbox folder.)
 metadata:
   {
-    "openclaw":
+    "core":
       { "requires": { "bins": ["node"], "files": ["/app/secrets/google_oauth.json"] } }
   }
 ---

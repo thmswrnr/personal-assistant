@@ -2,7 +2,7 @@
 name: sheets
 description: Read and write Google Sheets — create a spreadsheet, read a range, append rows, or overwrite cells. Use for "log this to a sheet", "add a row to my <X> spreadsheet", "what's in my <X> sheet", "start a spreadsheet for …", or any tracking/logging into Google Sheets.
 metadata:
-  { "openclaw": { "requires": { "bins": ["node"], "files": ["/app/secrets/google_oauth.json"] } } }
+  { "core": { "requires": { "bins": ["node"], "files": ["/app/secrets/google_oauth.json"] } } }
 ---
 
 # Google Sheets

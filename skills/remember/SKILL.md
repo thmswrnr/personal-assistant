@@ -3,7 +3,7 @@ name: remember
 description: Save, update, or remove a durable fact in Core's long-term memory — things worth recalling across sessions (the user's preferences, key facts about them, ongoing projects, useful references). Use when the user says "remember that…", "from now on…", "forget that…", or when a clearly durable fact/preference emerges in conversation. NOT for one-off or ephemeral details.
 metadata:
   {
-    "openclaw":
+    "core":
       { "requires": { "bins": ["node"] } }
   }
 ---

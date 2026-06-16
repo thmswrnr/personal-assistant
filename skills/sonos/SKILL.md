@@ -3,7 +3,7 @@ name: sonos
 description: Control the user's Sonos speaker/soundbar — play a saved favorite (playlists/stations), pause, resume, stop, skip, set volume, mute, and report what's playing. Use when the user says "play <name>/my playlist/some music", "pause", "stop", "next/previous", "turn it up/down", "set volume to N", "mute", or "what's playing". Local network only.
 metadata:
   {
-    "openclaw":
+    "core":
       { "requires": { "bins": ["sonos"], "env": ["SONOS_HOST"] } }
   }
 ---

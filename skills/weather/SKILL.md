@@ -3,7 +3,7 @@ name: weather
 description: Get current weather and a short forecast for a place, via Open-Meteo (no API key). Use for "what's the weather", "will it rain", "forecast for <city>", "do I need a jacket". Metric units (°C).
 metadata:
   {
-    "openclaw":
+    "core":
       { "requires": { "bins": ["node"] } }
   }
 ---

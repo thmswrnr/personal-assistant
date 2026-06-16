@@ -2,7 +2,7 @@
 name: haushaltsbuch
 description: Add expenses to the user's Haushaltsbuch (household budget) Google Sheet. Use when the user wants to log spending — "ich war einkaufen", "trag ins haushaltsbuch ein", "log this expense", reading off a Kassenbon/receipt grouped by category, any "X € for <category>", OR when the user sends/drops a photo or scan of a receipt/invoice (Kassenbon, Rechnung) — read it with vision and log it. Appends rows to the "Variable Ausgaben" tab only.
 metadata:
-  { "openclaw": { "requires": { "bins": ["node"], "files": ["/app/secrets/google_oauth.json"] } } }
+  { "core": { "requires": { "bins": ["node"], "files": ["/app/secrets/google_oauth.json"] } } }
 ---
 
 # Haushaltsbuch

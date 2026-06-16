@@ -3,7 +3,7 @@ name: notify
 description: Send the user a notification/message on their phone via Telegram. Use when asked to "notify me", "send me a message/reminder", "ping me when…", or to deliver a result to the user (e.g. from a scheduled task). Goes ONLY to the user's own Telegram chat.
 metadata:
   {
-    "openclaw":
+    "core":
       { "requires": { "bins": ["node"], "env": ["TELEGRAM_BOT_TOKEN", "TELEGRAM_CHAT_ID"] } }
   }
 ---

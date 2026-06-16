@@ -3,7 +3,7 @@ name: gmail
 description: Read the user's EMAIL (Gmail) and create draft replies — search, read, list labels, and save drafts. Use for email/mail requests ("check my email", "unread from Alice", "any mail from the bank?") and "draft a reply/email to…". Drafts are saved to Gmail, never sent. (Email — distinct from the local files inbox folder.)
 metadata:
   {
-    "openclaw":
+    "core":
       { "requires": { "bins": ["node"], "files": ["/app/secrets/google_oauth.json"] } }
   }
 ---

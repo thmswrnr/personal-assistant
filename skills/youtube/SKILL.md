@@ -3,7 +3,7 @@ name: youtube
 description: Work with YouTube — (1) fetch a video's transcript to summarize/answer about it, and (2) see the user's own subscriptions and recent uploads from channels they follow. Use for "summarize this YouTube video", "TL;DR of <link>", "what's new on my YouTube", "any new videos from my subscriptions", "what channels do I follow".
 metadata:
   {
-    "openclaw":
+    "core":
       { "requires": { "bins": ["node", "yt-dlp"], "files": ["/app/secrets/google_oauth.json"] } }
   }
 ---

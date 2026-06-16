@@ -3,7 +3,7 @@ name: calendar
 description: Read AND manage the user's Google Calendar — list calendars, show upcoming events / today's agenda / search, and create, edit, or delete events. Use for "what's on my calendar", "what do I have today/this week", "am I free…", "when is my next meeting", and "add/schedule/move/cancel …".
 metadata:
   {
-    "openclaw":
+    "core":
       { "requires": { "bins": ["node"], "files": ["/app/secrets/google_oauth.json"] } }
   }
 ---

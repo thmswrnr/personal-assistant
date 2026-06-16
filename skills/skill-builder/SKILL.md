@@ -2,7 +2,7 @@
 name: skill-builder
 description: Create a NEW skill for Core, or modify an existing one — ONLY when the user explicitly asks. Use for "write/create/make a skill", "build a new capability for yourself", "modify/change/improve the … skill", "teach yourself to …". Writes only to the writable custom_skills area, always shows the skill for approval first, and never acts on its own initiative.
 metadata:
-  { "openclaw": { "requires": { "bins": ["node"] } } }
+  { "core": { "requires": { "bins": ["node"] } } }
 ---
 
 # Skill Builder
@@ -37,7 +37,7 @@ skills are picked up on the **next** Core session (skills are scanned at startup
    - `name`: lowercase letters/numbers/hyphens, 1–64 chars, no leading/trailing or double
      hyphens (e.g. `recipe-finder`).
    - `description`: specific — say what it does *and when to use it* (this is what makes Core
-     pick it). Optional `metadata: { "openclaw": { "requires": { "bins": [...], "env": [...],
+     pick it). Optional `metadata: { "core": { "requires": { "bins": [...], "env": [...],
      "files": [...] } } }` listing what it needs.
    - Body: clear steps, with runnable `bash` blocks. If it needs a script, draft that too.
 3. **Show the user the full `SKILL.md` (and any script) and get explicit approval BEFORE

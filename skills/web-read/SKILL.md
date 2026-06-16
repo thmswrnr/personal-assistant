@@ -3,7 +3,7 @@ name: web-read
 description: Fetch a web page (by URL) and extract its main readable text, so you can summarize it or answer questions from the actual content. Use after a web search to read a promising result, or whenever the user gives a URL/article/blog link to read or summarize. Captions/snippets aren't enough — this gets the real page text.
 metadata:
   {
-    "openclaw":
+    "core":
       { "requires": { "bins": ["node"] } }
   }
 ---

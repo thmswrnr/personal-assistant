@@ -2,7 +2,7 @@
 name: todos
 description: Manage the user's main to-do list — the user's OWN action items. Use when the user asks to add a todo/task/reminder ("remind me to…", "add a todo…", including timed ones like "remind me to call the dentist in an hour"), see their todos, set a due date, or mark something done. Backed by Google Tasks, so it syncs with the user's phone (Google Tasks app) and the Gmail/Calendar side panel. For work CORE itself should run on a timer (briefings, recurring checks), use `schedule` instead.
 metadata:
-  { "openclaw": { "requires": { "bins": ["node"], "files": ["/app/secrets/google_oauth.json"] } } }
+  { "core": { "requires": { "bins": ["node"], "files": ["/app/secrets/google_oauth.json"] } } }
 ---
 
 # Todos

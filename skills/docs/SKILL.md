@@ -2,7 +2,7 @@
 name: docs
 description: Read and write Google Docs — create a document, read its text, or append text. Use for "draft a doc about …", "start a Google Doc", "what does my <X> doc say", "add this to my <X> doc". For spreadsheets use `sheets`; to just read any Drive file's metadata use `drive`.
 metadata:
-  { "openclaw": { "requires": { "bins": ["node"], "files": ["/app/secrets/google_oauth.json"] } } }
+  { "core": { "requires": { "bins": ["node"], "files": ["/app/secrets/google_oauth.json"] } } }
 ---
 
 # Google Docs

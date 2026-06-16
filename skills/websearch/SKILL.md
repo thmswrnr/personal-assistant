@@ -3,7 +3,7 @@ name: websearch
 description: Search the web for current information via a private self-hosted SearXNG instance (no API key, no tracking). Use when the user asks something that needs up-to-date or external facts — "search the web for…", "what's the latest on…", "find…", or any question your own knowledge can't answer reliably. Returns result links + snippets; pair with the web-read skill to read a page in full.
 metadata:
   {
-    "openclaw":
+    "core":
       { "requires": { "bins": ["node"] } }
   }
 ---

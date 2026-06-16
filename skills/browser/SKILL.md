@@ -3,7 +3,7 @@ name: browser
 description: Browse the web in a fresh sandboxed headless browser — open a page, read it, click links/buttons, fill and submit forms, navigate across pages. Use when the user wants Core to actually GO to a site and interact with it ("open X and do/tell me Y", "click/search/fill on this page", "step through this flow"). For a plain web search use `websearch`; to just read one page's text use `web-read`. The browser is fresh and NOT logged into the user's accounts.
 metadata:
   {
-    "openclaw":
+    "core":
       { "requires": { "bins": ["playwright-cli"] } }
   }
 ---

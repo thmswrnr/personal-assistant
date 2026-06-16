@@ -2,7 +2,7 @@
 name: transit
 description: Look up German public-transport / Deutsche Bahn connections — train & transit journeys between two places, next departures from a station, and live delays/platforms. Use when the user asks "next train to X", "how do I get from A to B by train/transit", "when's the next departure from <station>", "is my train delayed". Covers DB long-distance + regional + local transit across Germany.
 metadata:
-  { "openclaw": { "requires": { "bins": ["node"] } } }
+  { "core": { "requires": { "bins": ["node"] } } }
 ---
 
 # Transit (Deutsche Bahn & public transport)

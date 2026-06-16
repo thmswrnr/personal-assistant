@@ -3,7 +3,7 @@ name: github-pages
 description: Publish a website to GitHub Pages — create a repo, push HTML/site files, enable Pages, and return the live URL. Use when the user says "put this online", "publish a page/site", "make a GitHub Pages site", "host this", or wants a quick public web page. Read-write to the user's GitHub account (creates repos).
 metadata:
   {
-    "openclaw":
+    "core":
       { "requires": { "bins": ["gh", "git"], "files": ["/app/secrets/github_token"] } }
   }
 ---

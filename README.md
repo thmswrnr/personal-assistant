@@ -298,7 +298,7 @@ Adding a service, by case:
 Declare dependencies in `SKILL.md` frontmatter (OpenClaw-compatible):
 ```yaml
 metadata:
-  { "openclaw": { "requires": { "bins": ["gh"], "env": ["GITHUB_TOKEN"] } } }
+  { "core": { "requires": { "bins": ["gh"], "env": ["GITHUB_TOKEN"] } } }
 ```
 Credentials live in `data/secrets/` (git-ignored), read by the CLI — never through the model.
 Prefer **read-only** scopes and least privilege.
