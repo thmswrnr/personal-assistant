@@ -1,6 +1,6 @@
 ---
 name: google-maps
-description: Turn coordinates or a place into a Google Maps link or a map image with pins. Use to SHOW the user where something is — a single place ("show it on a map", "where is X"), or several places at once on one map (e.g. visualizing results from the `overpass` skill), optionally highlighting a referenced place like the user's home in a different colour.
+description: Google Maps helper — (1) SHOW where something is as a map link or pinned map image, and (2) DIRECTIONS/ETA between two places ("how long from home to X by car/transit", "route A→B", travel time, walking/cycling/driving/transit). Use for a single place ("show it on a map", "where is X"), several places on one map (e.g. visualizing `overpass` results, optional highlighted home), or door-to-door routing and travel time by any mode.
 metadata:
   { "core": { "requires": { "bins": ["node"] } } }
 ---
@@ -20,6 +20,10 @@ $M link "Bonn Hauptbahnhof"
 
 # Several places on ONE map image, with a referenced place highlighted (needs the Maps key)
 $M staticmap "50.7508,7.0762" "50.7363,7.0974" "50.7466,7.0997" --highlight "Londoner Straße 4, Bonn"
+
+# Directions + travel time between two places (needs the Maps key)
+$M directions "Bonn Hauptbahnhof" "Köln Dom" --mode transit
+$M directions "50.7320,7.0968" "Londoner Straße 4, Bonn" --mode driving   # default mode is driving
 ```
 
 ## When to use what
@@ -31,6 +35,12 @@ $M staticmap "50.7508,7.0762" "50.7363,7.0974" "50.7466,7.0997" --highlight "Lon
   as the map image). Combine with the overview list from whatever skill produced the points.
 - **Don't make a map for non-spatial answers** — "how far", "how many", "which is closest" are
   better as a sentence. Only visualize when *seeing the location* helps.
+- **Travel time / "how do I get there" / route** → `directions`. Prints JSON: `distance`,
+  `duration` (traffic-aware for driving), and for `--mode transit` the `departure`/`arrival`
+  times and the line-by-line `steps`; plus a `mapLink` to open the route. Modes: `driving`
+  (default), `walking`, `bicycling`, `transit`. Summarize it in a sentence; offer the `mapLink`.
+  For German rail specifically, the `transit` skill (Deutsche Bahn) has richer train detail —
+  use `directions --mode transit` for general/door-to-door routing and quick ETAs.
 
 ## Notes
 - `staticmap` needs a **Google Maps Platform** API key (this is *not* the Workspace OAuth token —

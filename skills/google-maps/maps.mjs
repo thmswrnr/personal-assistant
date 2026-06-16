@@ -8,6 +8,7 @@
 // Usage:
 //   node maps.mjs link "<lat,lon>" | "<place>"
 //   node maps.mjs staticmap "<loc>" ["<loc>" ...] [--highlight "<loc>"] [--size 640x480]
+//   node maps.mjs directions "<origin>" "<destination>" [--mode driving|walking|bicycling|transit]
 
 import { readFileSync } from "node:fs";
 
@@ -48,6 +49,47 @@ if (cmd === "link") {
   if (points.length) params.push(`markers=color:red%7C${points.slice(0, 15).map(loc).join("%7C")}`);
   params.push(`key=${key}`);
   console.log("https://maps.googleapis.com/maps/api/staticmap?" + params.join("&"));
+} else if (cmd === "directions") {
+  // Route + travel time between two places via the Directions API (same key as staticmap).
+  const key = mapsKey();
+  if (!key)
+    die("no Google Maps key — add it to /app/secrets/google_maps_api_key (enable the 'Directions API' in your Google Cloud project).");
+  const origin = process.argv[3];
+  const destination = process.argv[4];
+  if (!origin || !destination || origin.startsWith("--") || destination.startsWith("--"))
+    die('usage: maps.mjs directions "<origin>" "<destination>" [--mode driving|walking|bicycling|transit]');
+  const mode = (flag("mode", "driving") || "driving").toLowerCase();
+  const modes = ["driving", "walking", "bicycling", "transit"];
+  if (!modes.includes(mode)) die(`invalid --mode "${mode}" — one of: ${modes.join(", ")}`);
+
+  const params = new URLSearchParams({ origin: origin.trim(), destination: destination.trim(), mode, language: flag("lang", "en"), key });
+  if (mode === "driving" || mode === "transit") params.set("departure_time", "now"); // traffic-aware / next departures
+  const res = await fetch(`https://maps.googleapis.com/maps/api/directions/json?${params}`);
+  const j = await res.json();
+  if (j.status !== "OK") die(`Directions API: ${j.status}${j.error_message ? " — " + j.error_message : ""}`);
+
+  const route = j.routes[0], leg = route.legs[0];
+  const out = {
+    origin: leg.start_address,
+    destination: leg.end_address,
+    mode,
+    distance: leg.distance?.text,
+    duration: (leg.duration_in_traffic || leg.duration)?.text,
+    ...(mode === "transit"
+      ? {
+          departure: leg.departure_time?.text,
+          arrival: leg.arrival_time?.text,
+          steps: leg.steps.map((s) => {
+            const td = s.transit_details;
+            return td
+              ? `${td.line?.short_name || td.line?.name || "line"}: ${td.departure_stop?.name} → ${td.arrival_stop?.name} (${td.num_stops} stops, ${s.duration?.text})`
+              : `walk ${s.distance?.text} (${s.duration?.text})`;
+          }),
+        }
+      : { via: route.summary || undefined }),
+    mapLink: `https://www.google.com/maps/dir/?api=1&origin=${loc(origin)}&destination=${loc(destination)}&travelmode=${mode}`,
+  };
+  console.log(JSON.stringify(out, null, 2));
 } else {
-  die('commands: link "<lat,lon>|<place>"  |  staticmap "<loc>" [...] [--highlight "<loc>"] [--size WxH]');
+  die('commands: link "<lat,lon>|<place>"  |  staticmap "<loc>" [...] [--highlight "<loc>"] [--size WxH]  |  directions "<origin>" "<destination>" [--mode driving|walking|bicycling|transit]');
 }
