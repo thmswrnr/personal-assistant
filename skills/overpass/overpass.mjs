@@ -168,6 +168,7 @@ async function near() {
       website: tags.website || tags["contact:website"] || null,
       lat: p.lat ?? null,
       lon: p.lon ?? null,
+      map: p.lat != null ? `https://www.google.com/maps/search/?api=1&query=${p.lat},${p.lon}` : null,
       osm: `${e.type}/${e.id}`,
     };
   });

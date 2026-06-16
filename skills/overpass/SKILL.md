@@ -32,8 +32,10 @@ $O presets                                           # list the amenity words it
 - **`--radius`** metres (default 1500, max 10000) · **`--limit`** results (default 15, max 50).
   Keep the radius modest — it's faster and kinder to the public API.
 - Output is JSON: the resolved `center`, then `results` sorted **nearest first**, each with
-  `name`, `kind`, `distanceMeters`, `address`, `opening_hours`, `phone`, `website`, coords, and
-  the `osm` id. Summarize the top few for the user (name, distance, hours) rather than dumping it.
+  `name`, `kind`, `distanceMeters`, `address`, `opening_hours`, `phone`, `website`, coords, a
+  ready-to-open **`map`** link, and the `osm` id. Summarize the top few for the user (name,
+  distance, hours) rather than dumping it — **and always include each one's `map` link** so the
+  user can actually see/open it.
 
 ## Good to know
 - Data is community OpenStreetMap — usually good in cities, but `opening_hours`/`phone` may be
