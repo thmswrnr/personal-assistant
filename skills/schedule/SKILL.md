@@ -1,6 +1,6 @@
 ---
 name: schedule
-description: Manage Core's scheduled/recurring tasks — list, add, or remove jobs that run automatically at set times. Use when the user says "every morning…", "remind me to…", "schedule…", "run X daily/hourly/weekdays at…", "what's scheduled", or "stop the … job". Each job runs a Core prompt on a cron schedule.
+description: Manage Core's scheduled/recurring JOBS — work Core itself runs automatically at set times (a daily briefing, an hourly check, a weekly report). Use when the user wants Core to DO something on a schedule: "every morning…", "run X daily/hourly/weekdays at…", "schedule a job to…", "what's scheduled", "stop the … job". NOT for the user's own reminders/to-dos — "remind me to <do a thing myself>" (even "in 1 hour") goes to the `todos` skill (Google Tasks). Each job runs a Core prompt on a cron schedule.
 metadata:
   {
     "openclaw":
@@ -12,6 +12,13 @@ metadata:
 
 Core runs scheduled jobs from `storage/schedule.json` (the scheduler is Core's own
 process — no Telegram needed). Use this skill to manage them; changes apply live.
+
+> **Schedule vs. todos — who does the work?** A scheduled job is *Core* doing something
+> automatically at a time (fetch, summarize, notify, generate). A **reminder/to-do is the
+> *user's* own action item** — that belongs in the `todos` skill (Google Tasks), which syncs
+> to their phone, **even when it has a time** ("remind me to call the dentist in an hour" →
+> add a Google Task, don't create a cron job). Only reach for `schedule` when the prompt is
+> work Core itself should run on a recurring/timed basis.
 
 ## Commands (run via bash)
 

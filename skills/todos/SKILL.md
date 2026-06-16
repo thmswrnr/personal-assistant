@@ -1,6 +1,6 @@
 ---
 name: todos
-description: Manage the user's main to-do list. Use when the user asks to add a todo/task/reminder ("remind me to…", "add a todo…"), see their todos, set a due date, or mark something done. Backed by Google Tasks, so it syncs with the user's phone (Google Tasks app) and the Gmail/Calendar side panel.
+description: Manage the user's main to-do list — the user's OWN action items. Use when the user asks to add a todo/task/reminder ("remind me to…", "add a todo…", including timed ones like "remind me to call the dentist in an hour"), see their todos, set a due date, or mark something done. Backed by Google Tasks, so it syncs with the user's phone (Google Tasks app) and the Gmail/Calendar side panel. For work CORE itself should run on a timer (briefings, recurring checks), use `schedule` instead.
 metadata:
   { "openclaw": { "requires": { "bins": ["node"], "files": ["/app/secrets/google_oauth.json"] } } }
 ---
@@ -14,6 +14,11 @@ Google Tasks app on their phone and the Gmail/Calendar side panel. Manage it wit
 > **Project tasks go elsewhere.** This is the user's *general* list. Tasks that belong to a
 > specific project live in that project's own `storage/projects/<slug>/todos.md` — see the
 > `project-planning` skill. Don't mix project work into this list.
+>
+> **Reminders go here, not on the cron.** "Remind me to <do something myself>" is a to-do for
+> the user, so it goes here — *even if it names a time* ("…in an hour", "…tomorrow"). Google
+> Tasks tracks a `--due` **date** (not a clock time); add the task with the right due date and
+> say so. Only use the `schedule` skill when the user wants **Core** to run work at a time.
 
 ## Add a todo
 ```bash
