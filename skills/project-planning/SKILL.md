@@ -49,27 +49,31 @@ Write the plan to `/app/storage/projects/$slug/plan.md` with this shape (keep ea
 - the checkable definition of finished
 ```
 
-Then seed the **actionable** items into that project's *own* todo list — **not** the main one —
-by pointing `todo.sh` at the project folder via `TODO_DIR`:
+Then put the **actionable** items in that project's own `todos.md` — a plain Markdown
+checklist, kept deliberately simple (no priorities, due dates, or tags):
 
-```bash
-export TODO_DIR="/app/storage/projects/$slug"
-todo.sh add "(A) Install the toolchain"
-todo.sh add "Read the first three chapters due:2026-06-30"
-todo.sh ls          # confirm
+```markdown
+# Todos — <Project name>
+
+- [ ] Install the toolchain
+- [ ] Read the first three chapters
+- [ ] …
 ```
+
+Mark items `- [x]` as they're done. This is separate from the user's general to-do list (the
+`todos` skill) — project tasks stay here in the project folder.
 
 Other project files (notes, drafts, research) can live in the same `projects/$slug/` folder.
 
 ## Keeping it useful
 - The plan is a living document — when the user makes progress or changes direction, update
-  `plan.md` and the project's `todo.txt` (same `TODO_DIR` override) rather than starting over.
-- To check on a project later: read its `plan.md` and run `TODO_DIR=/app/storage/projects/<slug> todo.sh ls`.
+  `plan.md` and the project's `todos.md` rather than starting over.
+- To check on a project later: read its `plan.md` and `todos.md`.
 - Phases should be ordered and call out dependencies. Surface unknowns and risks honestly —
   a plan that hides the hard parts isn't useful.
 
 ## Rules
-- **Don't pollute the main todo list** (`storage/todo.txt`) with project tasks — each project
-  keeps its own (see the `todos` skill for the main list).
+- **Don't pollute the user's general to-do list** with project tasks — each project keeps its
+  own `todos.md` (the `todos` skill manages the general list).
 - Match effort to the ask: a quick question gets a quick structured answer, not a folder.
-- Use `todo.sh` for the project's tasks too (never hand-edit todo.txt).
+- Keep project todos plain: a simple `- [ ]` Markdown checklist — no priorities, dates, or tags.

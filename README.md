@@ -123,7 +123,7 @@ Stop: `docker compose down`.
 | Host path | In `core` | Purpose |
 |---|---|---|
 | `data/pi/` | `/app/.pi` | pi config: `models.json`, `SYSTEM.md`, `extensions/`, plus pi runtime (`sessions/`, …) |
-| `data/storage/` | `/app/storage` | your files: `inbox/`, `notes/` (the second brain), `processed/`, `todo.txt` (main list) + `projects/` (per-project plans & todos), `schedule.json`, `memory/` (long-term facts) |
+| `data/storage/` | `/app/storage` | your files: `inbox/`, `notes/` (the second brain), `processed/`, `projects/` (per-project `plan.md` + `todos.md`), `schedule.json`, `memory/` (long-term facts). The main to-do list lives in Google Tasks, not here. |
 | `data/secrets/` | `/app/secrets` | OAuth creds / tokens (git-ignored) |
 | `data/models/` | `/models` (in `llm`) | the GGUF model files |
 | `skills/` | `/app/.pi/skills` | `SKILL.md` capability packages (version-controlled) |
@@ -156,8 +156,8 @@ Skills are on-demand capability packages ([Agent Skills standard](https://agents
 | `schedule` | Manage recurring jobs (list / add / remove cron jobs). |
 | `process-inbox` | Read each file in `inbox/` (incl. **images** via vision) → note + todos → archive. |
 | `morning-briefing` | Dated greeting + unread email + today's calendar + weather + a joke. |
-| `todos` | Maintain your main to-do list (`todo.txt` standard, via the official `todo.sh` CLI — priorities, due dates, contexts). |
-| `project-planning` | Break any task/problem into a structured plan; saves real projects to their own `storage/projects/<slug>/` folder (`plan.md` + a project-scoped `todo.txt`). |
+| `todos` | Manage your main to-do list, backed by **Google Tasks** (syncs to the Google Tasks app + Gmail/Calendar side panel) — add / list / complete, due dates, multiple lists. |
+| `project-planning` | Break any task/problem into a structured plan; saves real projects to their own `storage/projects/<slug>/` folder (`plan.md` + a plain-markdown `todos.md`). |
 | `remember` | Save / recall / forget durable facts (Core's long-term memory — see below). |
 | `github-pages` | Publish a static site to GitHub Pages (create repo → push → enable Pages). Needs a PAT in `data/secrets/github_token`. |
 | `sonos` | Control a Sonos speaker — play / pause / volume / favorites. Local network; set `SONOS_HOST` (the speaker IP) in `.env`. |
@@ -285,7 +285,7 @@ Adding a service, by case:
 2. **A mature official CLI exists** (e.g. `gh`, `yt-dlp`, `ffmpeg`) → install it in
    **`core/Dockerfile`** (pinned) and rebuild once; the `SKILL.md` documents how to call it.
    Already baked in: **`yt-dlp`** (youtube), **`gh`** (github-pages), **`ffmpeg`** (voice),
-   **`todo.sh`** (todos / project-planning), **`sonos`** (sonos — compiled from source in a
+   **`sonos`** (sonos — compiled from source in a
    multi-stage build, since upstream ships macOS binaries only), and **`@playwright/cli` +
    headless Chrome** (browser). Most are tiny and
    harmless if unused; **Chrome is the one heavy add (~hundreds of MB)** — the cost of the

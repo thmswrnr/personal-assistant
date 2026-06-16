@@ -1,13 +1,15 @@
 #!/usr/bin/env node
 // One-time Google OAuth consent → stores a single refresh token shared by all the
-// Google skills (Gmail, Drive, Calendar). Re-run this whenever you add a skill that
-// needs a new scope (the token must be re-consented to cover it).
+// Google skills (Gmail, Drive, Calendar, Tasks, Sheets, Docs, YouTube). Re-run this whenever
+// you add a skill that needs a new scope (the token must be re-consented to cover it).
 //
 // Prereqs:
 //   - data/secrets/google_client_secret.json:
 //     the "Web application" OAuth client JSON from Google Cloud Console. Its authorized
-//     redirect URIs must include http://localhost:4100/oauth2callback, and the project
-//     must have the Gmail, Drive, Calendar, and YouTube Data APIs enabled.
+//     redirect URIs must include http://localhost:4100/oauth2callback, and the project must
+//     have these APIs enabled: Gmail, Drive, Calendar, YouTube Data, Tasks, Sheets, Docs.
+//     (Google silently DROPS any requested scope whose API isn't enabled — this script warns
+//     when that happens.)
 //
 // Usage (on the host):  node scripts/google-oauth.mjs
 //
@@ -27,15 +29,19 @@ const OUT_FILE = join(SECRETS, "google_oauth.json");
 
 const PORT = 4100;
 const REDIRECT_URI = `http://localhost:${PORT}/oauth2callback`;
-// Least-privilege scopes for the Google skills. All read-only except gmail.compose,
-// which only lets the gmail skill save DRAFTS (it never calls send). Add a scope here
-// and re-run this script when a new skill needs it.
+// Scopes for the Google skills. Read-only except: gmail.compose (drafts only — never sends),
+// calendar.events / tasks / spreadsheets / documents (read-write — the calendar/tasks/sheets/
+// docs skills gate every write behind a confirm-with-the-user rule). Add a scope here and
+// re-run this script when a new skill needs it (the consent must cover it).
 const SCOPES = [
   "https://www.googleapis.com/auth/gmail.readonly",
   "https://www.googleapis.com/auth/gmail.compose", // create drafts only (never sends)
   "https://www.googleapis.com/auth/drive.readonly",
-  "https://www.googleapis.com/auth/calendar.readonly",
+  "https://www.googleapis.com/auth/calendar.events", // read + create/edit/delete calendar events
   "https://www.googleapis.com/auth/youtube.readonly",
+  "https://www.googleapis.com/auth/tasks", // Google Tasks read/write — the general to-do list
+  "https://www.googleapis.com/auth/spreadsheets", // Google Sheets read/write
+  "https://www.googleapis.com/auth/documents", // Google Docs read/create/edit
 ];
 const AUTH_URI = "https://accounts.google.com/o/oauth2/v2/auth";
 const TOKEN_URI = "https://oauth2.googleapis.com/token";
