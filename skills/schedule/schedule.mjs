@@ -4,9 +4,12 @@
 //
 //   node schedule.mjs list
 //   node schedule.mjs add --label "Morning briefing" --cron "0 7 * * *" --prompt "/skill:morning-briefing"
+//   node schedule.mjs add --label "Inbox" --cron "*/2 * * * *" --prompt "/skill:process-inbox" --watch "ls /app/storage/inbox | grep -q ."
 //   node schedule.mjs remove --label "Morning briefing"
 //
 // cron = standard 5 fields: minute hour day-of-month month day-of-week (local time).
+// Optional --watch: a shell command used as a gate — cron becomes the CHECK cadence and the
+// prompt fires only when the watch exits 0 (see the scheduler for the full semantics).
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 
@@ -26,9 +29,10 @@ switch (cmd) {
     break;
   case "add": {
     const f = flags(rest);
-    if (!f.cron || !f.prompt) die('usage: add --label "X" --cron "0 7 * * *" --prompt "..."');
+    if (!f.cron || !f.prompt) die('usage: add --label "X" --cron "0 7 * * *" --prompt "..." [--watch "<shell cmd>"]');
     if (!validCron(f.cron)) die(`invalid cron "${f.cron}" — need 5 fields: minute hour day-of-month month day-of-week`);
     const job = { label: f.label || `job-${jobs.length + 1}`, cron: f.cron.trim(), prompt: f.prompt };
+    if (f.watch) job.watch = f.watch; // optional gate: cron becomes the check cadence; prompt fires only if this exits 0
     jobs.push(job);
     save(jobs);
     console.log(JSON.stringify({ added: job, total: jobs.length }, null, 2));

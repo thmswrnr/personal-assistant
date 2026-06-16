@@ -10,6 +10,16 @@
 //   { "label": "Morning briefing", "cron": "0 7 * * *",   "prompt": "/skill:morning-briefing" }
 //   { "label": "Weekday standup",  "cron": "30 8 * * 1-5", "prompt": "..." }
 //   { "label": "Hourly mail",      "cron": "0 * * * *",   "prompt": "..." }
+//
+// Optional `watch`: a cheap shell command used as a GATE. When present, `cron` is the
+// CHECK cadence — on each match the watch runs (deterministic, no LLM, outside the job
+// queue); the `prompt` fires only if the watch exits 0. This is how file-watching and
+// service-polling fit: the watch is the cheap "did anything change?" check, the prompt is
+// the (expensive) reaction. Make the watch edge-triggered — self-clearing (the reaction
+// removes the condition, e.g. process-inbox empties the inbox) or cursor-based (the script
+// records what it last saw and exits 0 only on something newer) — or it re-fires every tick.
+//   { "label": "Inbox", "cron": "*/2 * * * *",
+//     "watch": "ls /app/storage/inbox | grep -q .", "prompt": "/skill:process-inbox" }
 import { spawn } from "node:child_process";
 import { readFileSync } from "node:fs";
 
@@ -64,6 +74,24 @@ function runAgent(prompt) {
   });
 }
 
+// Cheap gate for `watch` jobs: run a shell command and resolve its exit code. Runs OUTSIDE
+// the LLM queue (it's not a Core run) so frequent checks never starve real jobs. Short
+// timeout so a hung watch can't pile up; timeout/error → non-zero (no fire).
+function runWatch(cmd) {
+  return new Promise((resolve) => {
+    const p = spawn(cmd, { cwd: "/app", shell: true, detached: true, stdio: ["ignore", "ignore", "pipe"] });
+    let err = "", done = false;
+    const finish = (code) => { if (done) return; done = true; clearTimeout(timer); resolve(code); };
+    const timer = setTimeout(() => {
+      try { process.kill(-p.pid, "SIGKILL"); } catch { try { p.kill("SIGKILL"); } catch { /* gone */ } }
+      finish(-1);
+    }, 30000);
+    p.stderr.on("data", (d) => (err += d));
+    p.on("close", (code) => finish(code ?? -1));
+    p.on("error", () => finish(-1));
+  });
+}
+
 // One job at a time (single GPU).
 let busy = false;
 const queue = [];
@@ -99,8 +127,16 @@ function tick() {
     const key = e.label || `job${i}`;
     try {
       if (cronMatch(e.cron, now) && lastFired[key] !== minute) {
-        lastFired[key] = minute;
-        enqueue(key, e.prompt);
+        lastFired[key] = minute; // per-minute guard: check at most once per matched minute
+        if (e.watch) {
+          // gated job: cron is the check cadence; fire the prompt only if the watch passes.
+          runWatch(e.watch).then((code) => {
+            if (code === 0) enqueue(key, e.prompt);
+            else log(`watch "${key}" → no fire (exit ${code})`);
+          });
+        } else {
+          enqueue(key, e.prompt); // plain time job
+        }
       }
     } catch (err) {
       log(`bad cron for "${key}": ${e.cron} (${err.message})`);
