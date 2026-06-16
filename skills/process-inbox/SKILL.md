@@ -12,7 +12,7 @@ inbox one file at a time and leave a clean audit trail.
 
 - Inbox:     `/app/storage/inbox/`
 - Notes:     `/app/storage/notes/`      (the "second brain")
-- Todos:     `/app/storage/todos.md`
+- Todos:     the user's Google Tasks list — add via the `todos` skill (not a local file)
 - Processed: `/app/storage/processed/`   (archive of handled originals)
 
 ## Steps
@@ -32,9 +32,14 @@ inbox one file at a time and leave a clean audit trail.
    b. **Summarize** it into a new note at `/app/storage/notes/<short-slug>.md` with a
       title, a 2–4 sentence summary, the original filename, and today's date (get it with
       `date +%Y-%m-%d` via bash). Keep one note per inbox item.
-   c. **Extract action items.** If the file implies anything to do, append a line to
-      `/app/storage/todos.md` using the bash `>>` append (do NOT overwrite the file):
-      `- [ ] <action> (from <filename>)`. If there are genuinely no actions, skip this.
+   c. **Extract action items.** If the file implies anything to do, add it to the user's
+      to-do list with the `todos` skill (e.g. `node /app/.pi/skills/todos/todos.mjs add
+      "<action> (from <filename>)"`). If there are genuinely no actions, skip this.
+   c2. **Is it a shopping receipt or an invoice for purchases?** (Kassenbon, Rechnung with
+      line items.) Then it's an **expense** — hand it to the `haushaltsbuch` skill to log it
+      (classify items → sum per category → append to Variable Ausgaben), instead of just a
+      note. Still write a short note and archive as usual. Confirm the breakdown with the user
+      before writing to the sheet.
    d. **Archive** the original with bash: `mv /app/storage/inbox/<file> /app/storage/processed/`.
 3. **Verify before finishing.** Run `ls /app/storage/inbox/` again — it must be empty (every
    file moved to `processed/`). If anything remains, you are not done: go back and finish it.

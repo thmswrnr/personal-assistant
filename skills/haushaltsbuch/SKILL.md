@@ -1,6 +1,6 @@
 ---
 name: haushaltsbuch
-description: Add expenses to the user's Haushaltsbuch (household budget) Google Sheet. Use when the user wants to log spending — "ich war einkaufen", "trag ins haushaltsbuch ein", "log this expense", reading off a Kassenbon/receipt grouped by category, or any "X € for <category>". Appends rows to the "Variable Ausgaben" tab only.
+description: Add expenses to the user's Haushaltsbuch (household budget) Google Sheet. Use when the user wants to log spending — "ich war einkaufen", "trag ins haushaltsbuch ein", "log this expense", reading off a Kassenbon/receipt grouped by category, any "X € for <category>", OR when the user sends/drops a photo or scan of a receipt/invoice (Kassenbon, Rechnung) — read it with vision and log it. Appends rows to the "Variable Ausgaben" tab only.
 metadata:
   { "openclaw": { "requires": { "bins": ["node"], "files": ["/app/secrets/google_oauth.json"] } } }
 ---
@@ -33,6 +33,24 @@ You only ever **append rows to `Variable Ausgaben`**. Everything else is the use
   fits, use **`Sonstiges`** (or ask). Don't invent a category that isn't in the list.
 - **Notiz** — **use it.** By default put the **shop name** here (e.g. `Rewe`, `dm`, `Aldi`).
   Add a short extra detail if the user mentions one (`Rewe — Geburtstagsgeschenk`).
+
+## From a photo or scan (receipt / invoice)
+
+Receipts often arrive as an **image** — sent on the fly via Telegram, or dropped in the inbox
+(`process-inbox` will hand it here). The model can read images, so:
+
+1. **Read the image.** Pull out: the **shop name** (header), the **date** (German receipts use
+   `DD.MM.YYYY` or `DD.MM.YY` — use the receipt's date, not today, unless it's unreadable), the
+   **line items** with their prices, and the printed **total** (Summe/Gesamt).
+2. **Classify + sum** the line items by category exactly as above (read `Kategorien!A:B`).
+3. **Reconcile.** Your per-category sums should add up to the receipt's printed total. If they
+   don't, something was misread or there's a Pfand/discount/deposit line — say so and check with
+   the user rather than forcing it.
+4. **Confirm the breakdown, then append** (one row per category, date from the receipt, shop in
+   Notiz). OCR from a phone photo can misread digits, so always show the parsed amounts for a
+   quick OK before writing.
+
+If an amount or the date is genuinely unreadable, ask — don't guess at money.
 
 ## Grouping — one row per category, per shopping trip
 
