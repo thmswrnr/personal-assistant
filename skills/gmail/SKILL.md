@@ -18,16 +18,16 @@ drafts are saved to Gmail for the user to review and send themselves.
 
 ```bash
 # Search (Gmail query syntax: is:unread, from:alice, newer_than:2d, subject:..., has:attachment)
-node /app/.pi/skills/gmail/gmail.mjs search "is:unread newer_than:2d" 10
+node /app/.pi/skills/gmail/scripts/gmail.mjs search "is:unread newer_than:2d" 10
 
 # Read one message in full (use an id from search results)
-node /app/.pi/skills/gmail/gmail.mjs read <messageId>
+node /app/.pi/skills/gmail/scripts/gmail.mjs read <messageId>
 
 # List labels
-node /app/.pi/skills/gmail/gmail.mjs labels
+node /app/.pi/skills/gmail/scripts/gmail.mjs labels
 
 # Create a DRAFT (saved to Gmail, never sent — the user reviews/sends it themselves)
-node /app/.pi/skills/gmail/gmail.mjs draft --to "alice@example.com" --subject "Re: lunch" --body "Sounds good — see you at noon."
+node /app/.pi/skills/gmail/scripts/gmail.mjs draft --to "alice@example.com" --subject "Re: lunch" --body "Sounds good — see you at noon."
 ```
 
 Each command prints JSON. `search` returns

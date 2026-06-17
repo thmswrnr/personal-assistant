@@ -23,13 +23,13 @@ process — no Telegram needed). Use this skill to manage them; changes apply li
 ## Commands (run via bash)
 
 ```bash
-node /app/.pi/skills/schedule/schedule.mjs list
+node /app/.pi/skills/schedule/scripts/schedule.mjs list
 
 # cron = 5 fields: minute hour day-of-month month day-of-week (local time)
-node /app/.pi/skills/schedule/schedule.mjs add \
+node /app/.pi/skills/schedule/scripts/schedule.mjs add \
   --label "Morning briefing" --cron "0 7 * * *" --prompt "/skill:morning-briefing"
 
-node /app/.pi/skills/schedule/schedule.mjs remove --label "Morning briefing"
+node /app/.pi/skills/schedule/scripts/schedule.mjs remove --label "Morning briefing"
 ```
 
 Common cron patterns: `0 7 * * *` = daily 07:00; `30 8 * * 1-5` = 08:30 on weekdays;
@@ -44,7 +44,7 @@ you can poll often without spinning up Core every tick.
 
 ```bash
 # Every 2 min, check the inbox; process it only if a file is there.
-node /app/.pi/skills/schedule/schedule.mjs add \
+node /app/.pi/skills/schedule/scripts/schedule.mjs add \
   --label "Inbox" --cron "*/2 * * * *" \
   --prompt "/skill:process-inbox" \
   --watch "ls /app/storage/inbox | grep -q ."

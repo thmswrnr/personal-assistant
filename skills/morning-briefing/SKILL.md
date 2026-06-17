@@ -15,7 +15,7 @@ thing brief and scannable, not a wall of text.
 
 2. **Unread email (today only).** Run the read-only Gmail CLI:
    ```bash
-   node /app/.pi/skills/gmail/gmail.mjs search "is:unread newer_than:1d" 10
+   node /app/.pi/skills/gmail/scripts/gmail.mjs search "is:unread newer_than:1d" 10
    ```
    - Lead with the count: use `estimatedTotal` to say e.g. "~23 unread in the last day".
    - Then summarize only the **notable few** as **sender — subject**: surface anything
@@ -26,7 +26,7 @@ thing brief and scannable, not a wall of text.
 
 3. **Today's calendar.** Run the read-only Calendar CLI:
    ```bash
-   node /app/.pi/skills/calendar/calendar.mjs today
+   node /app/.pi/skills/calendar/scripts/calendar.mjs today
    ```
    - List what's left of today as **time — title** (e.g. "10:00 Standup, 14:00 Dentist"),
      noting all-day events separately. If nothing's left today, say the day looks clear.
@@ -35,7 +35,7 @@ thing brief and scannable, not a wall of text.
 
 4. **Weather.** Run the weather CLI for the user's home city:
    ```bash
-   node /app/.pi/skills/weather/weather.mjs "<user's city>" 1
+   node /app/.pi/skills/weather/scripts/weather.mjs "<user's city>" 1
    ```
    - Give a one-liner: current temp + conditions and today's high/low, and call out rain
      if the chance is notable (e.g. "pack an umbrella").

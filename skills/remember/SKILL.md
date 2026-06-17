@@ -23,17 +23,17 @@ relying on it.
 
 ```bash
 # Save (or update) a fact. --slug is a stable kebab-case id; re-saving the same slug overwrites it.
-node /app/.pi/skills/remember/remember.mjs save \
+node /app/.pi/skills/remember/scripts/remember.mjs save \
   --slug user-city \
   --type user \
   --desc "where the user lives — base for weather, commute, briefings" \
   --body "Bonn, Germany."
 
 # Remove a fact
-node /app/.pi/skills/remember/remember.mjs forget --slug user-city
+node /app/.pi/skills/remember/scripts/remember.mjs forget --slug user-city
 
 # Show the current index
-node /app/.pi/skills/remember/remember.mjs list
+node /app/.pi/skills/remember/scripts/remember.mjs list
 ```
 
 `--type` is one of: `user` (who they are), `preference` (how they like things done),

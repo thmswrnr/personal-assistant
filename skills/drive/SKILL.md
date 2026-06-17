@@ -18,14 +18,14 @@ creates, edits, moves, or deletes anything.
 
 ```bash
 # List the N most-recently-modified files (newest first; default 20)
-node /app/.pi/skills/drive/drive.mjs list 20
+node /app/.pi/skills/drive/scripts/drive.mjs list 20
 
 # Find files by name or content (searches names + full text)
-node /app/.pi/skills/drive/drive.mjs search "budget" 20
-node /app/.pi/skills/drive/drive.mjs search "quarterly report" 20
+node /app/.pi/skills/drive/scripts/drive.mjs search "budget" 20
+node /app/.pi/skills/drive/scripts/drive.mjs search "quarterly report" 20
 
 # Read a file's text (use an id from list/search)
-node /app/.pi/skills/drive/drive.mjs read <fileId>
+node /app/.pi/skills/drive/scripts/drive.mjs read <fileId>
 ```
 
 Each command prints JSON.

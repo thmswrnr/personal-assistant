@@ -12,7 +12,7 @@ the place (Nominatim) and builds a small, bounded query for you — **you do not
 QL**; just pass a plain amenity word and a place.
 
 ```bash
-O="node /app/.pi/skills/overpass/overpass.mjs"
+O="node /app/.pi/skills/overpass/scripts/overpass.mjs"
 
 $O near "pharmacy" "Bonn Hauptbahnhof"              # POIs around a place name
 $O near "atm" "Friedensplatz, Bonn" --radius 500    # tighter radius (metres)

@@ -12,7 +12,7 @@ Auth is a personal API key sent as `Authorization: Bearer …`, read from `/app/
 (or `$ALAN_API_KEY`). Answers stream token-by-token to stdout.
 
 ```bash
-A="node /app/.pi/skills/alan/alan.mjs"
+A="node /app/.pi/skills/alan/scripts/alan.mjs"
 
 # One-shot question → Alan's answer (default model: Gemma 4 Instant — fast)
 $A ask "Summarise the EU AI Act in three bullet points"

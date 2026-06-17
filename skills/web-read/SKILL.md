@@ -16,7 +16,7 @@ boilerplate). Returns clean text ready to summarize.
 ## Command (run via bash)
 
 ```bash
-node /app/.pi/skills/web-read/web-read.mjs "https://example.com/article"
+node /app/.pi/skills/web-read/scripts/web-read.mjs "https://example.com/article"
 ```
 
 It prints JSON: `{url, title, chars, truncated, text}`.

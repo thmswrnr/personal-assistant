@@ -12,7 +12,7 @@ it with a skill that returns coordinates (e.g. `overpass` for "what's nearby"), 
 coordinates here. A location is either `"lat,lon"` or a place/address string.
 
 ```bash
-M="node /app/.pi/skills/google-maps/maps.mjs"
+M="node /app/.pi/skills/google-maps/scripts/maps.mjs"
 
 # One place → a plain Google Maps link (no API key needed)
 $M link "50.7320,7.0968"

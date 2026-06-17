@@ -138,8 +138,9 @@ Stop: `docker compose down`.
 ## Skills
 
 Skills are on-demand capability packages ([Agent Skills standard](https://agentskills.io/specification))
-— a directory with a `SKILL.md` (frontmatter `name` + `description`, then instructions), in
-`skills/` (mounted to pi's config dir). Current skills:
+— a directory with a `SKILL.md` (frontmatter `name` + `description`, then instructions) plus
+optional `scripts/` (executable code), `references/` (on-demand docs), and `assets/` subfolders,
+in `skills/` (mounted to pi's config dir). Current skills:
 
 | Skill | What it does |
 |---|---|
@@ -174,7 +175,7 @@ Skills are on-demand capability packages ([Agent Skills standard](https://agents
 > `SKILL.md` loads on demand. Asked in plain language, a local model may act on the description
 > alone and skip steps — `/skill:<name>` forces the full instructions in.
 
-Add a skill by creating `skills/<name>/SKILL.md` (+ an optional CLI) and `docker compose restart core`.
+Add a skill by creating `skills/<name>/SKILL.md` (+ an optional CLI in `scripts/`) and `docker compose restart core`.
 
 ### Vision & voice
 Gemma 4 is multimodal — Core can *see* images and *hear* audio. Drop an image in
@@ -286,7 +287,7 @@ Two kinds of skills:
 
 Adding a service, by case:
 
-1. **Pure API (HTTP + JSON)** → a small **self-contained Node CLI** in the skill folder (the
+1. **Pure API (HTTP + JSON)** → a small **self-contained Node CLI** in the skill's `scripts/` folder (the
    image has `node`, `curl`, `jq` — **no rebuild**). The CLI holds the credential and calls the
    API, so the token never enters the model's context. Most skills are this case.
 2. **A mature official CLI exists** (e.g. `gh`, `yt-dlp`, `ffmpeg`) → install it in

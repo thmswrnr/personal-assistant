@@ -11,7 +11,7 @@ Read/write the user's Google Docs via the Docs v1 API. Reading is free; **creati
 changes the user's Drive — confirm the gist with the user before writing.**
 
 ```bash
-D="node /app/.pi/skills/docs/docs.mjs"
+D="node /app/.pi/skills/docs/scripts/docs.mjs"
 
 $D create "Meeting notes" --text "First line of the doc."   # new doc → prints id + url
 $D find "Meeting notes"                                       # locate existing docs by name → id

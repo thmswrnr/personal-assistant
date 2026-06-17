@@ -12,7 +12,7 @@ real spreadsheet — confirm with the user before appending/updating** (especial
 which overwrites).
 
 ```bash
-S="node /app/.pi/skills/sheets/sheets.mjs"
+S="node /app/.pi/skills/sheets/scripts/sheets.mjs"
 
 $S create "Expenses 2026"                       # new spreadsheet → prints id + url
 $S find "Expenses"                               # locate existing sheets by name → id

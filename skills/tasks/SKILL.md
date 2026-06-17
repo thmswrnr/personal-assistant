@@ -10,7 +10,7 @@ metadata:
 The user's tasks live in **Google Tasks** (synced to their phone + the Gmail/Calendar side
 panel). It's not one list — there are **three lists, each with a distinct role**. Your job is
 to put each item on the **right** list. Manage them with the CLI
-(`node /app/.pi/skills/tasks/tasks.mjs`), which uses the shared Google OAuth token.
+(`node /app/.pi/skills/tasks/scripts/tasks.mjs`), which uses the shared Google OAuth token.
 
 ## The lists and where things go
 
@@ -36,21 +36,21 @@ to put each item on the **right** list. Manage them with the CLI
 
 ## Add a task (pick the list per the rules above)
 ```bash
-node /app/.pi/skills/tasks/tasks.mjs add "Pick up parcel"                       # → Todo (default)
-node /app/.pi/skills/tasks/tasks.mjs add "Call dentist" --due 2026-06-20         # → Todo, with a due date
-node /app/.pi/skills/tasks/tasks.mjs add "Milch" --list "Einkaufsliste"          # → shopping list
-node /app/.pi/skills/tasks/tasks.mjs add "Renew passport (from scan.pdf)" --list "Inbox"  # → capture
+node /app/.pi/skills/tasks/scripts/tasks.mjs add "Pick up parcel"                       # → Todo (default)
+node /app/.pi/skills/tasks/scripts/tasks.mjs add "Call dentist" --due 2026-06-20         # → Todo, with a due date
+node /app/.pi/skills/tasks/scripts/tasks.mjs add "Milch" --list "Einkaufsliste"          # → shopping list
+node /app/.pi/skills/tasks/scripts/tasks.mjs add "Renew passport (from scan.pdf)" --list "Inbox"  # → capture
 ```
 `--due` is `YYYY-MM-DD`. Confirm what you added **and to which list**.
 
 ## List / change tasks
 ```bash
-node /app/.pi/skills/tasks/tasks.mjs list                       # open tasks on Todo (default)
-node /app/.pi/skills/tasks/tasks.mjs list --list "Einkaufsliste" # open tasks on another list
-node /app/.pi/skills/tasks/tasks.mjs list --all                 # also show recently completed
-node /app/.pi/skills/tasks/tasks.mjs done 2 [--list "<name>"]   # complete task #2 on that list
-node /app/.pi/skills/tasks/tasks.mjs rm   2 [--list "<name>"]   # delete task #2 on that list
-node /app/.pi/skills/tasks/tasks.mjs lists                      # show all task lists
+node /app/.pi/skills/tasks/scripts/tasks.mjs list                       # open tasks on Todo (default)
+node /app/.pi/skills/tasks/scripts/tasks.mjs list --list "Einkaufsliste" # open tasks on another list
+node /app/.pi/skills/tasks/scripts/tasks.mjs list --all                 # also show recently completed
+node /app/.pi/skills/tasks/scripts/tasks.mjs done 2 [--list "<name>"]   # complete task #2 on that list
+node /app/.pi/skills/tasks/scripts/tasks.mjs rm   2 [--list "<name>"]   # delete task #2 on that list
+node /app/.pi/skills/tasks/scripts/tasks.mjs lists                      # show all task lists
 ```
 `--list` matches a list by title (substring, case-insensitive). The `n` in `done`/`rm` comes
 from a `list` of **that same list** — always `list` first, then act, then confirm.

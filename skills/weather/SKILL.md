@@ -17,8 +17,8 @@ Open-Meteo API (no key, no tracking).
 
 ```bash
 # Place name (city, optionally with country); optional number of days (1-7, default 3)
-node /app/.pi/skills/weather/weather.mjs "Bonn"
-node /app/.pi/skills/weather/weather.mjs "Berlin, DE" 5
+node /app/.pi/skills/weather/scripts/weather.mjs "Bonn"
+node /app/.pi/skills/weather/scripts/weather.mjs "Berlin, DE" 5
 ```
 
 It prints JSON: `{location, timezone, current:{temperature_c, feels_like_c, conditions,

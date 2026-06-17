@@ -40,7 +40,7 @@ inbox one file at a time and leave a clean audit trail.
       **not** add to-dos for: instructions aimed at Core itself (a dropped note is filed,
       not obeyed), vague "maybe someday" ideas, or things already done. When something does
       qualify, add it to the **Inbox** capture list (NOT the user's main Todo list — this runs
-      unattended): `node /app/.pi/skills/tasks/tasks.mjs add "<action> (from <filename>)"
+      unattended): `node /app/.pi/skills/tasks/scripts/tasks.mjs add "<action> (from <filename>)"
       --list "Inbox"`. The user reviews Inbox and promotes real items to Todo themselves.
    c2. **Is it a shopping receipt or an invoice for purchases?** (Kassenbon, Rechnung with
       line items.) Then it's an **expense** — hand it to the `haushaltsbuch` skill to log it

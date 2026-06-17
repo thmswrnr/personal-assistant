@@ -13,16 +13,16 @@ Europe/Berlin local; delays are in minutes (`0`/null ≈ on time).
 Run the CLI with `node`:
 ```bash
 # Connections A -> B (next few, from now)
-node /app/.pi/skills/transit/transit.mjs journeys "Bonn Hbf" "Köln Hbf"
+node /app/.pi/skills/transit/scripts/transit.mjs journeys "Bonn Hbf" "Köln Hbf"
 
 # ... departing at a specific time
-node /app/.pi/skills/transit/transit.mjs journeys "Bonn" "Frankfurt(Main)Hbf" --when "2026-06-16T08:00"
+node /app/.pi/skills/transit/scripts/transit.mjs journeys "Bonn" "Frankfurt(Main)Hbf" --when "2026-06-16T08:00"
 
 # Next departures from a station (board)
-node /app/.pi/skills/transit/transit.mjs departures "Bonn Hbf"
+node /app/.pi/skills/transit/scripts/transit.mjs departures "Bonn Hbf"
 
 # Just resolve a station name to candidates (journeys/departures already do this for you)
-node /app/.pi/skills/transit/transit.mjs find "Bonn"
+node /app/.pi/skills/transit/scripts/transit.mjs find "Bonn"
 ```
 
 ## Reading the output (JSON)

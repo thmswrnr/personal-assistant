@@ -24,9 +24,21 @@ another task, or because it "would be helpful". If you merely *think* a new skil
 - **Your writable area:** `/app/storage/custom_skills/<name>/` — this is the *only* place you
   write skills. New skills and your own edits go here.
 
-A skill is a folder with a `SKILL.md` (required) plus any helper scripts/assets. New or changed
-skills are picked up on the **next** Core session (skills are scanned at startup) — they will
-**not** be live in the current conversation. Tell the user this.
+A skill is a folder with a `SKILL.md` (required) and, optionally, these standard subfolders:
+
+```
+<name>/
+├── SKILL.md       # required: frontmatter (name + description) + instructions
+├── scripts/       # executable code Core runs (here: one or more *.mjs)
+├── references/    # extra docs Core reads on demand — loaded only when SKILL.md says to
+└── assets/        # static resources: templates, schemas, data/lookup files
+```
+
+Most skills need only `SKILL.md` (+ `scripts/`). Reach for `references/` when a skill carries more
+detail than belongs in the always-loaded body (point at it with "read `references/X.md` when …"),
+and `assets/` for output templates or data files. New or changed skills are picked up on the
+**next** Core session (skills are scanned at startup) — they will **not** be live in the current
+conversation. Tell the user this.
 
 ## Creating a new skill
 
@@ -48,9 +60,9 @@ skills are picked up on the **next** Core session (skills are scanned at startup
      good skill** and **Scripts in skills** (below) for what makes the description and body work.
 3. **Show the user the full `SKILL.md` (and any script) and get explicit approval BEFORE
    writing anything.** Never write-and-run silently.
-4. **On approval, write** to `/app/storage/custom_skills/<name>/SKILL.md` (and scripts in the
-   same folder). In the skill's bash, reference its own files by **absolute path**
-   `/app/storage/custom_skills/<name>/<file>`.
+4. **On approval, write** to `/app/storage/custom_skills/<name>/SKILL.md` (and any scripts under
+   `/app/storage/custom_skills/<name>/scripts/`). In the skill's bash, reference its own files by
+   **absolute path**, e.g. `/app/storage/custom_skills/<name>/scripts/<file>.mjs`.
 5. Confirm what you created and remind the user it's active **next session**.
 
 ## Writing a good skill
@@ -93,9 +105,10 @@ runs over time.
 ## Scripts in skills
 
 Prefer a small **bundled script** over a long inline sequence of shell commands whenever the logic
-is fragile or repeated (this project already does this — one `*.mjs` per skill). List the scripts
-in `SKILL.md` and call them by **absolute path**: `/app/.pi/skills/<name>/<file>` for curated
-skills, `/app/storage/custom_skills/<name>/<file>` for your own (Core runs them from there).
+is fragile or repeated (this project already does this — one `*.mjs` per skill). Put scripts in the
+skill's **`scripts/` subfolder** — use several when a skill has distinct or specialised actions.
+List them in `SKILL.md` and call them by **absolute path**: `/app/.pi/skills/<name>/scripts/<file>`
+for curated skills, `/app/storage/custom_skills/<name>/scripts/<file>` for your own.
 
 Design scripts for an agent to drive:
 - **Never interactive** — take input via flags/args/env, never a prompt (a non-interactive shell

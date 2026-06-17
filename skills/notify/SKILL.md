@@ -18,13 +18,13 @@ user (the configured chat) — never anyone else.
 **Text message:**
 
 ```bash
-node /app/.pi/skills/notify/notify.mjs "your message here"
+node /app/.pi/skills/notify/scripts/notify.mjs "your message here"
 ```
 
 **A file** (document, image, generated report, etc. — optional caption):
 
 ```bash
-node /app/.pi/skills/notify/send-file.mjs "/app/storage/artefacts/report.md" "your daily report"
+node /app/.pi/skills/notify/scripts/send-file.mjs "/app/storage/artefacts/report.md" "your daily report"
 ```
 
 Both print `{"sent":true,...}` on success. The file is sent as a Telegram document (max

@@ -49,7 +49,7 @@ Usual flow: the user reads off the receipt. Classify each item, sum per category
 then append them in a single call.
 
 ```bash
-S="node /app/.pi/skills/sheets/sheets.mjs"
+S="node /app/.pi/skills/sheets/scripts/sheets.mjs"
 
 # 1. This year's book → id (exact-name match, e.g. haushaltsbuch2026)
 $S find "haushaltsbuch2026"
