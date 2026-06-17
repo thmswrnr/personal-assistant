@@ -1,81 +1,80 @@
 ---
 name: alan
-description: Ask Alan — the Comma-Soft Alan assistant (an agentic LLM at dev.alan.de). Use to send a question/prompt to Alan and get its answer, to continue or revisit an earlier Alan conversation (list existing chats and pick one up), or to list which Alan models are available. Reach for this when the user explicitly wants "Alan" / the Comma-Soft assistant or a second-opinion answer from it — not for general questions you can answer yourself.
+description: Ask Alan — the Comma-Soft Alan assistant (a remote agentic LLM at dev.alan.de, incl. frontier models like GPT-5.4). Use to send a one-off prompt and get Alan's answer, to continue or revisit an earlier Alan conversation (list or search existing chats, then pick one up), or to list available Alan models. Reach for it when the user explicitly wants "Alan" / the Comma-Soft assistant, or a stronger second opinion than Core's own model gives — not for general questions Core can answer itself. Does not use Alan's knowledge bases, experts, or file uploads.
 metadata:
   { "core": { "requires": { "bins": ["node"], "files": ["/app/secrets/alan_api_key"] } } }
 ---
 
 # Alan
 
-Talks to the **Comma-Soft Alan** backend (`https://dev.alan.de/api/v1`) — an agentic assistant.
-Auth is a personal API key sent as `Authorization: Bearer …`, read from `/app/secrets/alan_api_key`
-(or `$ALAN_API_KEY`). Answers stream token-by-token to stdout.
+Client for the **Comma-Soft Alan** backend (`https://dev.alan.de/api/v1`) — a remote assistant
+with stronger/agentic models than Core runs locally. Auth is a personal API key
+(`Authorization: Bearer …`, from `/app/secrets/alan_api_key` or `$ALAN_API_KEY`). Most commands
+print **JSON** — pipe through `jq` to pull what you need. This skill is deliberately scoped to
+plain chat: no knowledge bases, experts, abilities, or file attachments.
 
 ```bash
 A="node /app/.pi/skills/alan/scripts/alan.mjs"
 
-# One-shot question → Alan's answer (default model: Gemma 4 Instant — fast)
+# One-off question → Alan's answer (streamed). Default model: Gemma 4 Instant (fast).
 $A ask "Summarise the EU AI Act in three bullet points"
+$A ask "Plan a careful migration strategy" --model comma-soft/gemma4-31b   # a thinking model
+$A ask "What is 17*23?" --model comma-soft/gemma4-31b --reasoning          # show its reasoning
 
-# Pick a model: --instant (fast), --thinking (reasoning), --gpt (GPT-5.4), or --model <name>
-$A ask "Plan a careful migration strategy" --thinking
-$A ask "Draft a polite reminder email" --gpt
-
-# Show the model's reasoning as it thinks (dimmed), then the answer
-$A ask "What is 17*23?" --thinking --reasoning
-
-# Steer with a system prompt
-$A ask "translate to German" --system "You are a terse professional translator"
-
-# List existing chats (newest first) / the chat models available
-$A chats            # most recent 15 (--limit N, or --all)
-$A models
-```
-
-## Continuing a conversation
-
-Alan keeps each chat's prior turns server-side, so you can pick one up later. Two ways to get a
-chat's id:
-
-**Right after `ask`** — it answers in a fresh, UI-hidden chat and prints a footer to **stderr**:
-
-```
-— chat <chat_id> · msg <message_id>
-```
-
-**Or discover an earlier one** with `chats` — JSON of `{id, title, updated, model, apiOnly}`,
-newest first (`apiOnly: true` = a chat this skill created; those have no `title`):
-
-```bash
-$A chats --limit 20
-```
-
-Then continue it — you only need the **chat id**; `reply` resolves the chat's latest message itself:
-
-```bash
+# Continue a conversation (just the chat id — the latest message is resolved for you)
 $A reply <chat_id> "And what about the second option?"
+
+# Find a chat to continue
+$A chats                       # recent chats, newest first (--limit N, or --all)
+$A search "migration plan"     # find chats by title/message content (--bookmarked to narrow)
+
+# Discover models
+$A models --available          # only chat-usable models (full attributes)
 ```
 
-(You may also pass the `<prev_msg_id>` from a footer explicitly — `reply <chat_id> <prev_msg_id>
-"…"` — which skips the lookup.) `reply` prints its own footer, so you can keep chaining.
+## Choosing a model
+
+`models --available` returns the models you can pass to `--model` (status `available`, type
+`chatllm`). The id to pass is the **`primary_name`** field:
+
+```bash
+$A models --available | jq -r '.models[] | "\(.primary_name)\t\(.title)\t\(.capabilities)"'
+```
+
+Each model's `description` says what it's for (e.g. Gemma *Thinking* = deep analysis, *Instant* =
+quick answers; `openai/gpt-5.4` = strongest general model). If `--model` is omitted, `ask` uses a
+fast default. `ask` is one-off; to keep context across turns, use `reply` (below).
+
+## Continuing & finding a conversation
+
+Alan stores each chat server-side, so a conversation can be resumed later. Get a chat id one of
+three ways, then `reply <chat_id> "<prompt>"`:
+
+- **Right after `ask`** — it prints `— chat <chat_id>` to stderr.
+- **`chats`** — JSON `[{id, title, updated, model, apiOnly}]`, newest first. Best for "my last
+  Alan chat". Note: chats this skill creates are `apiOnly` and have **no title** — identify them
+  by `updated`/`model`, or find them by content with `search`.
+- **`search "<query>"`** — JSON `{results:[{chat_id, excerpt}]}`, matching chat titles **and
+  message text**. Best for "the Alan thread about X"; the `excerpt` confirms the match.
+
+`reply` always continues from the chat's latest message (it resolves the tip itself — you never
+pass a message id). It prints its own `— chat <chat_id>` footer, so you can keep chaining.
 
 ## When to use what
 
-- **`ask`** — the normal path. A single question; Alan replies. Summarise the answer for the user
-  (it's already streamed in full). Default model is **Gemma 4 Instant** for a quick reply; use
-  `--thinking` for hard reasoning, `--gpt` for the strongest general model.
-- **`chats`** — to find an existing conversation to resume ("continue my last Alan chat", "what
-  was that Alan thread about X"). Lists newest first; pick an `id`. Note skill-created chats show
-  no title — identify them by `updated`/`model`, or `reply` to the most recent.
-- **`reply`** — to continue a chat, whether one you just started (id from the footer) or one found
-  via `chats`. Just pass the chat id; the latest message is resolved for you.
-- **`models`** — when the user asks which Alan models exist, or before passing `--model`. Models
-  marked `(inactive)` can't be used; pick an available one.
+- **`ask`** — the normal path: one question, Alan answers. Summarise the streamed answer for the
+  user. Use a thinking model (`--model comma-soft/gemma4-31b`) for hard reasoning, `openai/gpt-5.4`
+  for the strongest general answer.
+- **`reply`** — to continue a chat (from the `ask` footer, `chats`, or `search`).
+- **`chats` / `search`** — to find an earlier conversation to resume (recency vs. by-topic).
+- **`models`** — when the user asks which Alan models exist, or before choosing `--model`.
 
 ## Notes
-- Don't reach for Alan for things you can already answer or another skill handles better — use it
-  when the user specifically wants *Alan's* answer.
-- The OpenAI-compatible `/oai/*` endpoints are intentionally not used (they're currently broken);
-  this skill drives Alan's native streaming chat API.
-- If the key is missing, the skill says so — add it to `/app/secrets/alan_api_key`. Create the key
-  in Alan under user settings → API keys.
+- Use Alan when the user specifically wants *Alan's* answer or a stronger model than Core's own —
+  not for things Core (or another skill) already handles.
+- Chats are created `api_only` (hidden from the Alan web UI). Big payloads (full message lists)
+  are consumed inside the script and never enter Core's context; only answers and chat ids print.
+- The OpenAI-compatible `/oai/*` endpoints are intentionally unused (currently broken); this skill
+  drives Alan's native streaming chat API.
+- If the key is missing the skill says so — add it to `/app/secrets/alan_api_key` (create it in
+  Alan under user settings → API keys).

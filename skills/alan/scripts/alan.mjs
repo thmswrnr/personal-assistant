@@ -8,28 +8,23 @@
 //   $ALAN_API_KEY or the file /app/secrets/alan_api_key (whitespace-trimmed).
 //
 // Usage:
-//   node alan.mjs ask "<prompt>" [--model <name>|--instant|--thinking|--gpt]
-//                                [--system "<prompt>"] [--reasoning]
-//   node alan.mjs reply <chat_id> ["<prev_msg_id>"] "<prompt>" [--reasoning]
-//   node alan.mjs chats [--limit N | --all]   # list existing chats, newest first
-//   node alan.mjs models                      # list available chat models
+//   node alan.mjs ask "<prompt>" [--model <name>] [--reasoning]
+//   node alan.mjs reply <chat_id> "<prompt>" [--reasoning]
+//   node alan.mjs chats [--limit N | --all]       # list chats, newest first
+//   node alan.mjs search "<query>" [--bookmarked]  # find chats by title/message content
+//   node alan.mjs models [--available]            # list models (extended info)
 //
-// `ask` answers in a fresh, UI-hidden chat and prints a footer
-//   "— chat <chat_id> · msg <message_id>" to stderr so you can `reply` to continue.
-// `reply` continues a chat; if you omit <prev_msg_id> it resolves the chat's latest
-//   message itself, so a chat found via `chats` can be continued with just its id.
+// `ask` answers in a fresh, UI-hidden chat and prints "— chat <chat_id>" to stderr.
+// `reply` continues a chat from its latest message (resolved here); the chat_id comes
+//   from that footer, from `chats`, or from `search`.
 
 import { readFileSync } from "node:fs";
 
 const BASE = (process.env.ALAN_API_BASE || "https://dev.alan.de/api/v1").replace(/\/$/, "");
 
-// Friendly aliases → real model names (see `models`). Default favours a fast reply.
-const MODEL_ALIASES = {
-  instant: "comma-soft/gemma4-31b-instant",
-  thinking: "comma-soft/gemma4-31b",
-  gpt: "openai/gpt-5.4",
-};
-const DEFAULT_MODEL = MODEL_ALIASES.instant;
+// Default model when `ask` is called without --model: a fast, available chat model
+// (see `models --available`). Override per call with --model <name>.
+const DEFAULT_MODEL = "comma-soft/gemma4-31b-instant";
 
 function die(m) { console.error(`alan: ${m}`); process.exit(1); }
 
@@ -40,23 +35,6 @@ function apiKey() {
 
 function flag(name, def) { const i = process.argv.indexOf(`--${name}`); return i >= 0 ? process.argv[i + 1] : def; }
 function has(name) { return process.argv.includes(`--${name}`); }
-
-// Positional args from `args`, skipping flags (and the value of value-taking ones).
-const VALUE_FLAGS = new Set(["model", "system", "temperature", "limit", "lang"]);
-function positionals(args) {
-  const out = [];
-  for (let i = 0; i < args.length; i++) {
-    const a = args[i];
-    if (a.startsWith("--")) { if (VALUE_FLAGS.has(a.slice(2))) i++; continue; }
-    out.push(a);
-  }
-  return out;
-}
-
-function chosenModel() {
-  for (const [alias, name] of Object.entries(MODEL_ALIASES)) if (has(alias)) return name;
-  return flag("model", DEFAULT_MODEL);
-}
 
 async function api(path, { method = "GET", body } = {}) {
   const key = apiKey();
@@ -86,7 +64,7 @@ async function latestMessageId(chatId) {
 }
 
 // Drive a chat SSE stream to completion, printing assistant tokens as they arrive.
-// Returns { chatId, messageId } of the assistant answer for follow-ups.
+// Prints the answer to stdout and the chat id to stderr (for `reply`).
 async function streamChat(res) {
   if (!res.ok && res.headers.get("content-type")?.includes("application/json")) {
     let detail = "";
@@ -97,7 +75,7 @@ async function streamChat(res) {
 
   const showReasoning = has("reasoning");
   let answer = "";
-  let chatId = null, messageId = null;
+  let chatId = null;
   let printedAny = false, inReasoning = false;
 
   const decoder = new TextDecoder();
@@ -117,7 +95,6 @@ async function streamChat(res) {
           chatId = ev.chat?.resource_id || chatId;
           break;
         case "tokens":
-          messageId = ev.message_id || messageId;
           if (showReasoning && ev.reasoning_tokens) {
             if (!inReasoning) { process.stdout.write("\x1b[2m"); inReasoning = true; } // dim
             process.stdout.write(ev.reasoning_tokens);
@@ -132,7 +109,6 @@ async function streamChat(res) {
         case "message":
           // Final, authoritative copy of the assistant turn.
           if (ev.message?.role === "assistant" && ev.message?.state === "Done") {
-            messageId = ev.message.resource_id || messageId;
             if (ev.message.content) answer = ev.message.content; // trust final content
           }
           break;
@@ -147,35 +123,24 @@ async function streamChat(res) {
   else if (answer) console.log(answer);
   else die("no answer returned");
 
-  if (chatId && messageId) console.error(`\n— chat ${chatId} · msg ${messageId}`);
-  return { chatId, messageId, answer };
-}
-
-function buildSettings() {
-  const settings = { model: chosenModel() };
-  const sys = flag("system");
-  if (sys) settings.system_prompt = sys;
-  const temp = flag("temperature");
-  if (temp != null) settings.temperature = Number(temp);
-  return settings;
+  if (chatId) console.error(`\n— chat ${chatId}`);
+  return { chatId, answer };
 }
 
 const cmd = process.argv[2];
 
 if (cmd === "ask") {
   const content = process.argv[3];
-  if (!content || content.startsWith("--")) die('usage: alan.mjs ask "<prompt>" [--model <name>|--instant|--thinking|--gpt] [--system "<prompt>"] [--reasoning]');
-  const res = await api("/chats/", { method: "POST", body: { content, settings: buildSettings(), api_only: true } });
+  if (!content || content.startsWith("--")) die('usage: alan.mjs ask "<prompt>" [--model <name>] [--reasoning]');
+  const settings = { model: flag("model", DEFAULT_MODEL) };
+  const res = await api("/chats/", { method: "POST", body: { content, settings, api_only: true } });
   await streamChat(res);
 } else if (cmd === "reply") {
-  // reply <chat_id> "<prompt>"  OR  reply <chat_id> <prev_msg_id> "<prompt>"
-  const p = positionals(process.argv.slice(3));
-  const chatId = p[0];
-  const prevId = p.length >= 3 ? p[1] : null;
-  const content = p.length >= 3 ? p[2] : p[1];
-  if (!chatId || !content)
-    die('usage: alan.mjs reply <chat_id> ["<prev_msg_id>"] "<prompt>"');
-  const previous_message_id = prevId || (await latestMessageId(chatId));
+  // Continue a chat from its latest message. chat_id comes from ask's footer, `chats`,
+  // or `search`; the tip is resolved here so only the chat id is needed.
+  const chatId = process.argv[3], content = process.argv[4];
+  if (!chatId || !content || content.startsWith("--")) die('usage: alan.mjs reply <chat_id> "<prompt>"');
+  const previous_message_id = await latestMessageId(chatId);
   const res = await api(`/chats/${chatId}/generate`, { method: "POST", body: { previous_message_id, content } });
   await streamChat(res);
 } else if (cmd === "chats") {
@@ -192,15 +157,26 @@ if (cmd === "ask") {
     apiOnly: c.api_only || false,
   }));
   console.log(JSON.stringify(out, null, 2));
-} else if (cmd === "models") {
-  const res = await api("/models/");
+} else if (cmd === "search") {
+  // Find chats by content: POST /search/ matches chat titles AND message text, returning
+  // { results: [{ chat_id, excerpt }] } — enough to pick a chat_id for `reply` (api_only
+  // chats have no title, so this is the way to find them by topic).
+  const query = process.argv[3];
+  if (!query || query.startsWith("--")) die('usage: alan.mjs search "<query>" [--bookmarked]');
+  const body = { query };
+  if (has("bookmarked")) body.bookmarked = true;
+  const res = await api("/search/", { method: "POST", body });
   if (!res.ok) die(`HTTP ${res.status}`);
-  const data = await res.json();
-  const models = (data.models || []).filter((m) => !/embedding/i.test(m.name));
-  for (const m of models) {
-    const tag = m.status === "available" ? "" : `  (${m.status})`;
-    console.log(`${m.name}\t${m.title}${tag}`);
-  }
+  console.log(JSON.stringify(await res.json(), null, 2));
+} else if (cmd === "models") {
+  // Passthrough of GET /models/extended/ — richer than /models/: model_type, capabilities
+  // (e.g. "vision"), reasoning_levels, primary_name (+ valid_names aliases). Small payload,
+  // Core jq's it. --available trims to chat-usable models: available status + chatllm type.
+  const res = await api("/models/extended/");
+  if (!res.ok) die(`HTTP ${res.status}`);
+  let models = (await res.json()).models || [];
+  if (has("available")) models = models.filter((m) => m.status === "available" && m.model_type === "chatllm");
+  console.log(JSON.stringify({ models }, null, 2));
 } else {
-  die('commands: ask "<prompt>" [flags]  |  reply <chat_id> ["<prev_msg_id>"] "<prompt>"  |  chats [--limit N|--all]  |  models');
+  die('commands: ask "<prompt>" [--model M] [--reasoning]  |  reply <chat_id> "<prompt>"  |  chats [--limit N|--all]  |  search "<query>" [--bookmarked]  |  models [--available]');
 }
