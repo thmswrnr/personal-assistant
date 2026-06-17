@@ -29,5 +29,4 @@ It prints JSON: `{url, title, chars, truncated, text}`.
    specific question, grounded in the `text`. Mention the source title/URL.
 3. If `truncated` is true (long page), say so and work from the portion you have.
 4. If it errors (page blocked, not HTML/text like a PDF, or unreachable), report that
-   plainly. Don't fabricate the page's contents.
-5. **Don't invent** — only state what the fetched text actually says.
+   plainly — never fabricate the page's contents; state only what the fetched text says.

@@ -46,5 +46,5 @@ thing brief and scannable, not a wall of text.
 
 ## Rules
 
-- Read-only: only summarize, never imply you sent or changed anything.
-- Don't fabricate email content — only report what the CLI returned.
+- Read-only: only summarize, never imply you sent or changed anything (the per-step "don't
+  invent" caveats still apply — report only what each CLI returned).

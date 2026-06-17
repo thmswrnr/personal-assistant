@@ -23,7 +23,7 @@ inbox one file at a time and leave a clean audit trail.
    in `Zone.Identifier` are not content (`rm /app/storage/inbox/*Zone.Identifier* 2>/dev/null`).
    If the inbox is then empty, tell the user there's nothing to process and stop.
 2. **For each file, complete ALL FOUR sub-steps before moving to the next file.** A file is
-   only finished once it has been archived (step d). Do not stop after writing the note.
+   only finished once it has been archived (step d). Do not stop after writing the artefact.
    a. **Read** it. Plain text / markdown / code: read directly. **Images** (photos,
       screenshots, receipts, scans): read them too — the model can see images — and pull
       out the useful content (e.g. a receipt → vendor, total, date; a screenshot → the

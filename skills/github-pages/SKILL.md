@@ -64,7 +64,6 @@ automatically. Use plain **`git push`** (the credential helper from the Auth ste
 authenticate) — there is **no** `gh repo push` command, don't reach for one.
 
 ## Notes
-- Keep `GH_TOKEN` inline (`$(cat …)`) — never echo the token or hard-code it.
 - Repo name: derive a clean slug from the user's request unless they specify one; confirm it
   back. If a repo by that name exists, pick another or ask.
 - Static sites only (HTML/CSS/JS). No build step unless the user sets one up.

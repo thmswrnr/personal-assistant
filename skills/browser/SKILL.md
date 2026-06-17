@@ -12,12 +12,8 @@ metadata:
 
 Drive a real (headless) browser with the `playwright-cli` tool — plain shell commands. It works
 off the page's **accessibility snapshot**: every interactive element gets a stable ref like `e7`,
-and you act on it by ref. Reason over the snapshot *text*, not pixels.
-
-**`snapshot` is how you SEE and READ a page** — it returns the page's text *and* its interactive
-elements as compact YAML. You do **not** need a screenshot to read a page; the snapshot already
-contains the content. Reading the snapshot is the default, cheap, reliable path — screenshots are
-a rare last resort (see below), not the normal way to look at a page.
+and you act on it by ref. Reason over the snapshot *text*, not pixels — `snapshot` returns the
+page's content, so you read a page by reading it, not by screenshotting (see "Reading a page").
 
 The browser is a **fresh, sandboxed session — not logged into any of the user's accounts.**
 

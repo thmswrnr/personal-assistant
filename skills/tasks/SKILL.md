@@ -58,10 +58,7 @@ from a `list` of **that same list** — always `list` first, then act, then conf
 "Promote from Inbox to Todo" = `list --list "Inbox"` to find it, `add` it to Todo, then
 `rm <n> --list "Inbox"`.
 
-## Rules
-- Put each item on the **right list** (see the routing rules) — and **never** auto-fill Todo;
-  that list is the user's, written only on their explicit request.
+## Notes
 - Keep each item short and actionable.
-- Project-specific tasks belong in `storage/projects/<slug>/todos.md` (see `project-planning`).
 - If the CLI says credentials are missing, the user needs to run `scripts/google-oauth.mjs`
   (with the `tasks` scope) — don't invent tasks.

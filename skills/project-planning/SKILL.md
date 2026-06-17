@@ -71,9 +71,3 @@ Other project files (notes, drafts, research) can live in the same `projects/$sl
 - To check on a project later: read its `plan.md` and `todos.md`.
 - Phases should be ordered and call out dependencies. Surface unknowns and risks honestly —
   a plan that hides the hard parts isn't useful.
-
-## Rules
-- **Don't pollute the user's general to-do list** with project tasks — each project keeps its
-  own `todos.md` (the `tasks` skill manages the general list).
-- Match effort to the ask: a quick question gets a quick structured answer, not a folder.
-- Keep project todos plain: a simple `- [ ]` Markdown checklist — no priorities, dates, or tags.
