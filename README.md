@@ -123,7 +123,7 @@ Stop: `docker compose down`.
 | Host path | In `core` | Purpose |
 |---|---|---|
 | `data/pi/` | `/app/.pi` | pi config: `models.json`, `SYSTEM.md`, `extensions/`, plus pi runtime (`sessions/`, …) |
-| `data/storage/` | `/app/storage` | your files: `inbox/`, `notes/` (the second brain), `processed/`, `projects/` (per-project `plan.md` + `todos.md`), `schedule.json`, `memory/` (long-term facts), `custom_skills/` (Core's own writable skills — see `skill-builder`). The main to-do list lives in Google Tasks, not here. |
+| `data/storage/` | `/app/storage` | your files: `inbox/`, `artefacts/` (the second brain), `processed/`, `projects/` (per-project `plan.md` + `todos.md`), `schedule.json`, `memory/` (long-term facts), `custom_skills/` (Core's own writable skills — see `skill-builder`). The main to-do list lives in Google Tasks, not here. |
 | `data/secrets/` | `/app/secrets` | OAuth creds / tokens (git-ignored) |
 | `data/models/` | `/models` (in `llm`) | the GGUF model files |
 | `skills/` | `/app/.pi/skills` | `SKILL.md` capability packages (version-controlled) |
@@ -167,6 +167,7 @@ Skills are on-demand capability packages ([Agent Skills standard](https://agents
 | `remember` | Save / recall / forget durable facts (Core's long-term memory — see below). |
 | `github-pages` | Publish a static site to GitHub Pages (create repo → push → enable Pages). Needs a PAT in `data/secrets/github_token`. |
 | `sonos` | Control a Sonos speaker — play / pause / volume / favorites. Local network; set `SONOS_HOST` (the speaker IP) in `.env`. |
+| `alan` | Ask the **Comma-Soft Alan** assistant (agentic LLM) and continue conversations. Streams the answer; pick a model (instant / thinking / GPT-5.4). Needs an API key in `data/secrets/alan_api_key`. |
 
 > **Invoke skills with `/skill:<name>`** (or `./core.sh skill <name>`) for reliable execution.
 > pi uses *progressive disclosure*: only a skill's description is always in context; the full
