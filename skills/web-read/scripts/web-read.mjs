@@ -62,7 +62,8 @@ try {
     redirect: "follow",
     signal: AbortSignal.timeout(25000),
   });
-} catch (e) {
+}
+catch (e) {
   die(`could not fetch ${url} (${e.message})`);
 }
 if (!res.ok) die(`fetch failed: ${res.status} ${res.statusText} for ${url}`);
@@ -74,9 +75,11 @@ let title = "", text;
 if (ctype.includes("html") || /<html/i.test(raw)) {
   title = decodeEntities((raw.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1] ?? "").trim());
   text = htmlToText(mainRegion(raw));
-} else if (ctype.includes("text") || ctype.includes("json")) {
+}
+else if (ctype.includes("text") || ctype.includes("json")) {
   text = raw.trim(); // already plain
-} else {
+}
+else {
   die(`unsupported content type "${ctype}" — not an HTML/text page (e.g. a PDF or binary).`);
 }
 

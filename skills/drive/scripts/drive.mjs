@@ -24,7 +24,8 @@ async function accessToken() {
   let creds;
   try {
     creds = JSON.parse(readFileSync(OAUTH_FILE, "utf8"));
-  } catch {
+  }
+  catch {
     die(`could not read credentials at ${OAUTH_FILE} — run scripts/google-oauth.mjs first`);
   }
   const body = new URLSearchParams({
@@ -106,9 +107,11 @@ async function cmdRead(token, id) {
       return { id, name: meta.name, mimeType: mt, note: "Google Workspace file with no text export (e.g. form/drawing). Open via Drive." };
     }
     content = await apiText(`${DRIVE}/files/${id}/export?mimeType=${encodeURIComponent(target)}`, token);
-  } else if (TEXTUAL.test(mt)) {
+  }
+  else if (TEXTUAL.test(mt)) {
     content = await apiText(`${DRIVE}/files/${id}?alt=media`, token);
-  } else {
+  }
+  else {
     return {
       id,
       name: meta.name,

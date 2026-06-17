@@ -29,7 +29,8 @@ async function accessToken() {
   let creds;
   try {
     creds = JSON.parse(readFileSync(OAUTH_FILE, "utf8"));
-  } catch {
+  }
+  catch {
     die(`could not read credentials at ${OAUTH_FILE} — run scripts/google-oauth.mjs first`);
   }
   const body = new URLSearchParams({
@@ -68,7 +69,8 @@ function parseFlags(args) {
       const next = args[i + 1];
       if (next === undefined || next.startsWith("--")) out[a.slice(2)] = true;
       else out[a.slice(2)] = args[++i];
-    } else out._.push(a);
+    }
+    else out._.push(a);
   }
   return out;
 }
@@ -79,7 +81,8 @@ function rowsFrom(f, cellsStart) {
     let v;
     try {
       v = JSON.parse(f.json);
-    } catch {
+    }
+    catch {
       die("--json must be a JSON 2D array, e.g. '[[\"a\",\"b\"]]'");
     }
     if (!Array.isArray(v) || !Array.isArray(v[0])) die("--json must be a 2D array (array of rows)");
@@ -99,25 +102,29 @@ if (cmd === "create") {
   if (!title) die('usage: sheets.mjs create "<title>"');
   const j = await api(SHEETS, token, { method: "POST", body: { properties: { title } } });
   console.log(JSON.stringify({ created: j.properties?.title, id: j.spreadsheetId, url: j.spreadsheetUrl }, null, 2));
-} else if (cmd === "find") {
+}
+else if (cmd === "find") {
   const filter = f._[1];
   let q = "mimeType='application/vnd.google-apps.spreadsheet' and trashed=false";
   if (filter) q += ` and name contains '${filter.replace(/'/g, "\\'")}'`;
   const url = `${DRIVE}?q=${encodeURIComponent(q)}&orderBy=modifiedTime desc&pageSize=20&fields=files(id,name,modifiedTime)`;
   const j = await api(url, token);
   console.log(JSON.stringify((j.files ?? []).map((x) => ({ id: x.id, name: x.name, modified: x.modifiedTime })), null, 2));
-} else if (cmd === "tabs") {
+}
+else if (cmd === "tabs") {
   const id = f._[1];
   if (!id) die("usage: sheets.mjs tabs <id>");
   const j = await api(`${SHEETS}/${encodeURIComponent(id)}?fields=properties.title,sheets.properties(title,gridProperties)`, token);
   console.log(JSON.stringify({ title: j.properties?.title, tabs: (j.sheets ?? []).map((s) => s.properties?.title) }, null, 2));
-} else if (cmd === "read") {
+}
+else if (cmd === "read") {
   const id = f._[1];
   const range = f._[2];
   if (!id || !range) die('usage: sheets.mjs read <id> "<range>"');
   const j = await api(`${SHEETS}/${encodeURIComponent(id)}/values/${encodeURIComponent(range)}`, token);
   console.log(JSON.stringify({ range: j.range, values: j.values ?? [] }, null, 2));
-} else if (cmd === "append") {
+}
+else if (cmd === "append") {
   const id = f._[1];
   const range = f._[2];
   if (!id || !range) die('usage: sheets.mjs append <id> "<range>" <cell ...> | --json \'<2D array>\'');
@@ -125,7 +132,8 @@ if (cmd === "create") {
   const url = `${SHEETS}/${encodeURIComponent(id)}/values/${encodeURIComponent(range)}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`;
   const j = await api(url, token, { method: "POST", body: { values } });
   console.log(JSON.stringify({ appended: values.length, updatedRange: j.updates?.updatedRange }, null, 2));
-} else if (cmd === "update") {
+}
+else if (cmd === "update") {
   const id = f._[1];
   const range = f._[2];
   if (!id || !range) die('usage: sheets.mjs update <id> "<range>" <cell ...> | --json \'<2D array>\'');
@@ -133,6 +141,7 @@ if (cmd === "create") {
   const url = `${SHEETS}/${encodeURIComponent(id)}/values/${encodeURIComponent(range)}?valueInputOption=USER_ENTERED`;
   const j = await api(url, token, { method: "PUT", body: { values } });
   console.log(JSON.stringify({ updatedRange: j.updatedRange, updatedCells: j.updatedCells }, null, 2));
-} else {
+}
+else {
   die('commands: create "<title>" | find [name] | tabs <id> | read <id> "<range>" | append <id> "<range>" <cells> | update <id> "<range>" <cells>');
 }

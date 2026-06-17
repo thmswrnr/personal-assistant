@@ -37,7 +37,8 @@ try {
   const res = await fetch(`${BASE}/search?${params}`, { signal: AbortSignal.timeout(20000) });
   if (!res.ok) die(`SearXNG returned ${res.status} (is the searxng container up?)`);
   data = await res.json();
-} catch (e) {
+}
+catch (e) {
   die(`could not reach SearXNG at ${BASE} (${e.message}). Is the container running?`);
 }
 

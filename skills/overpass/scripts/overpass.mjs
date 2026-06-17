@@ -97,9 +97,11 @@ async function fetchJson(url, opts, what) {
   let res;
   try {
     res = await fetch(url, { ...opts, signal: ctrl.signal, headers: { "User-Agent": UA, ...(opts?.headers || {}) } });
-  } catch (e) {
+  }
+  catch (e) {
     die(e.name === "AbortError" ? `${what} timed out` : `network error reaching ${what}: ${e.message}`);
-  } finally {
+  }
+  finally {
     clearTimeout(t);
   }
   if (res.status === 429) die(`${what} is rate-limiting (429) — wait a moment and retry.`);
@@ -133,7 +135,8 @@ async function near() {
   const lat = flag("lat"), lon = flag("lon");
   if (lat != null && lon != null) {
     center = { lat: +lat, lon: +lon, name: `${lat},${lon}` };
-  } else {
+  }
+  else {
     const place = process.argv[4];
     if (!place || place.startsWith("--")) die('need a "<place>" (or --lat/--lon).');
     center = await geocode(place);

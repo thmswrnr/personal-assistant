@@ -111,6 +111,7 @@ try {
     truncated,
     transcript: truncated ? text.slice(0, CAP) + "\n…[truncated — long video]" : text,
   }, null, 2));
-} finally {
+}
+finally {
   rmSync(dir, { recursive: true, force: true });
 }

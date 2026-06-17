@@ -25,7 +25,8 @@ async function accessToken() {
   let creds;
   try {
     creds = JSON.parse(readFileSync(OAUTH_FILE, "utf8"));
-  } catch {
+  }
+  catch {
     die(`could not read credentials at ${OAUTH_FILE} — run scripts/google-oauth.mjs first`);
   }
   const body = new URLSearchParams({
@@ -64,7 +65,8 @@ function parseFlags(args) {
       const next = args[i + 1];
       if (next === undefined || next.startsWith("--")) out[a.slice(2)] = true;
       else out[a.slice(2)] = args[++i];
-    } else out._.push(a);
+    }
+    else out._.push(a);
   }
   return out;
 }
@@ -98,24 +100,28 @@ if (cmd === "create") {
   const id = doc.documentId;
   if (f.text && f.text !== true) await appendText(token, id, f.text);
   console.log(JSON.stringify({ created: title, id, url: `https://docs.google.com/document/d/${id}/edit` }, null, 2));
-} else if (cmd === "find") {
+}
+else if (cmd === "find") {
   const filter = f._[1];
   let q = "mimeType='application/vnd.google-apps.document' and trashed=false";
   if (filter) q += ` and name contains '${filter.replace(/'/g, "\\'")}'`;
   const url = `${DRIVE}?q=${encodeURIComponent(q)}&orderBy=modifiedTime desc&pageSize=20&fields=files(id,name,modifiedTime)`;
   const j = await api(url, token);
   console.log(JSON.stringify((j.files ?? []).map((x) => ({ id: x.id, name: x.name, modified: x.modifiedTime })), null, 2));
-} else if (cmd === "read") {
+}
+else if (cmd === "read") {
   const id = f._[1];
   if (!id) die("usage: docs.mjs read <id>");
   const doc = await api(`${DOCS}/${encodeURIComponent(id)}`, token);
   console.log(JSON.stringify({ title: doc.title, text: extractText(doc) }, null, 2));
-} else if (cmd === "append") {
+}
+else if (cmd === "append") {
   const id = f._[1];
   const text = f._[2];
   if (!id || !text) die('usage: docs.mjs append <id> "<text>"');
   await appendText(token, id, text);
   console.log(JSON.stringify({ appended: text.length, id }, null, 2));
-} else {
+}
+else {
   die('commands: create "<title>" [--text ..] | find [name] | read <id> | append <id> "<text>"');
 }

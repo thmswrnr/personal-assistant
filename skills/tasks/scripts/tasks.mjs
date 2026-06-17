@@ -26,7 +26,8 @@ async function accessToken() {
   let creds;
   try {
     creds = JSON.parse(readFileSync(OAUTH_FILE, "utf8"));
-  } catch {
+  }
+  catch {
     die(`could not read credentials at ${OAUTH_FILE} — run scripts/google-oauth.mjs first`);
   }
   const body = new URLSearchParams({
@@ -69,7 +70,8 @@ function parseFlags(args) {
       const next = args[i + 1];
       if (next === undefined || next.startsWith("--")) out[a.slice(2)] = true; // boolean flag
       else out[a.slice(2)] = args[++i];
-    } else out._.push(a);
+    }
+    else out._.push(a);
   }
   return out;
 }
@@ -108,7 +110,8 @@ const token = await accessToken();
 if (cmd === "lists") {
   const j = await api("/users/@me/lists", token);
   console.log(JSON.stringify((j.items ?? []).map((l) => ({ id: l.id, title: l.title })), null, 2));
-} else if (cmd === "list") {
+}
+else if (cmd === "list") {
   const listId = await resolveList(token, f.list);
   const all = !!f.all;
   const path =
@@ -125,7 +128,8 @@ if (cmd === "lists") {
       .filter((t) => t.status === "completed")
       .map((t) => ({ title: t.title, completed: dateOnly(t.completed) }));
   console.log(JSON.stringify(result, null, 2));
-} else if (cmd === "add") {
+}
+else if (cmd === "add") {
   const title = f._[1];
   if (!title) die('usage: tasks.mjs add "<title>" [--due YYYY-MM-DD] [--notes "..."] [--list "<name>"]');
   const listId = await resolveList(token, f.list);
@@ -137,7 +141,8 @@ if (cmd === "lists") {
   }
   const t = await api(`/lists/${encodeURIComponent(listId)}/tasks`, token, { method: "POST", body });
   console.log(JSON.stringify({ added: t.title, due: dateOnly(t.due), id: t.id }, null, 2));
-} else if (cmd === "done") {
+}
+else if (cmd === "done") {
   const ref = f._[1];
   if (!ref) die("usage: tasks.mjs done <n|id> [--list \"<name>\"]");
   const listId = await resolveList(token, f.list);
@@ -147,13 +152,15 @@ if (cmd === "lists") {
     body: { status: "completed" },
   });
   console.log(JSON.stringify({ completed: t.title }, null, 2));
-} else if (cmd === "rm") {
+}
+else if (cmd === "rm") {
   const ref = f._[1];
   if (!ref) die("usage: tasks.mjs rm <n|id> [--list \"<name>\"]");
   const listId = await resolveList(token, f.list);
   const id = await resolveTaskId(token, listId, ref);
   await api(`/lists/${encodeURIComponent(listId)}/tasks/${encodeURIComponent(id)}`, token, { method: "DELETE" });
   console.log(JSON.stringify({ removed: id }, null, 2));
-} else {
+}
+else {
   die('commands: list [--all] | add "<title>" [--due YYYY-MM-DD] [--notes ..] | done <n> | rm <n> | lists   (optional --list "<name>")');
 }

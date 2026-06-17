@@ -29,7 +29,8 @@ async function accessToken() {
   let creds;
   try {
     creds = JSON.parse(readFileSync(OAUTH_FILE, "utf8"));
-  } catch {
+  }
+  catch {
     die(`could not read credentials at ${OAUTH_FILE} — run scripts/google-oauth.mjs first`);
   }
   const body = new URLSearchParams({

@@ -21,7 +21,8 @@ async function accessToken() {
   let creds;
   try {
     creds = JSON.parse(readFileSync(OAUTH_FILE, "utf8"));
-  } catch {
+  }
+  catch {
     die(`could not read credentials at ${OAUTH_FILE} — run scripts/google-oauth.mjs first`);
   }
   const body = new URLSearchParams({
@@ -91,7 +92,8 @@ async function channelUploads(channelId) {
     });
     if (!res.ok) return [];
     xml = await res.text();
-  } catch {
+  }
+  catch {
     return [];
   }
   const channel = decode(xmlTag(xml, "title") ?? "");
@@ -110,7 +112,8 @@ const token = await accessToken();
 if (cmd === "subscriptions") {
   const subs = await getSubscriptions(token);
   console.log(JSON.stringify({ count: subs.length, subscriptions: subs }, null, 2));
-} else if (cmd === "feed") {
+}
+else if (cmd === "feed") {
   const days = Math.min(Math.max(parseInt(arg ?? "7", 10) || 7, 1), 30);
   const cutoff = Date.now() - days * 86400000;
   const subs = await getSubscriptions(token);
@@ -122,6 +125,7 @@ if (cmd === "subscriptions") {
     .slice(0, 40)
     .map((v) => ({ title: v.title, channel: v.channel, published: v.published, url: `https://www.youtube.com/watch?v=${v.videoId}` }));
   console.log(JSON.stringify({ sinceDays: days, channelsChecked: subs.length, newVideos: videos.length, videos }, null, 2));
-} else {
+}
+else {
   die("unknown command. use: subscriptions | feed [days]");
 }

@@ -87,16 +87,19 @@ if (cmd === "save") {
   writeFileSync(file, content);
   const total = reindex();
   console.log(JSON.stringify({ saved: slug, action: existed ? "updated" : "created", type, totalFacts: total }));
-} else if (cmd === "forget") {
+}
+else if (cmd === "forget") {
   const slug = (args.slug || "").trim();
   const file = `${DIR}/${slug}.md`;
   if (!existsSync(file)) die(`no such memory: ${slug}`);
   rmSync(file, { force: true });
   const total = reindex();
   console.log(JSON.stringify({ forgot: slug, totalFacts: total }));
-} else if (cmd === "list") {
+}
+else if (cmd === "list") {
   reindex();
   process.stdout.write(existsSync(INDEX) ? readFileSync(INDEX, "utf8") : "(no memory yet)\n");
-} else {
+}
+else {
   die("usage: save | forget | list  (see the skill doc)");
 }

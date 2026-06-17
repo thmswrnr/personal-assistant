@@ -16,7 +16,10 @@ import { dirname } from "node:path";
 const FILE = process.env.SCHEDULE_FILE ?? "/app/storage/schedule.json";
 
 function die(m) { console.error(`schedule: ${m}`); process.exit(1); }
-function load() { try { const j = JSON.parse(readFileSync(FILE, "utf8")); return Array.isArray(j) ? j : []; } catch { return []; } }
+function load() {
+  try { const j = JSON.parse(readFileSync(FILE, "utf8")); return Array.isArray(j) ? j : []; }
+  catch { return []; } 
+}
 function save(j) { mkdirSync(dirname(FILE), { recursive: true }); writeFileSync(FILE, JSON.stringify(j, null, 2) + "\n"); }
 function flags(a) { const o = {}; for (let i = 0; i < a.length; i++) if (a[i].startsWith("--")) o[a[i].slice(2)] = a[++i] ?? ""; return o; }
 const validCron = (c) => typeof c === "string" && c.trim().split(/\s+/).length === 5;

@@ -27,7 +27,8 @@ async function getJson(path, params) {
   let res;
   try {
     res = await fetch(url, { headers: { "User-Agent": UA, Accept: "application/json" } });
-  } catch (e) {
+  }
+  catch (e) {
     die(`network error reaching the transit service: ${e.message}`);
   }
   if (res.status === 503)
@@ -39,10 +40,10 @@ async function getJson(path, params) {
 const fmtTime = (iso) =>
   iso
     ? new Date(iso).toLocaleString("de-DE", {
-        dateStyle: "short",
-        timeStyle: "short",
-        timeZone: "Europe/Berlin",
-      })
+      dateStyle: "short",
+      timeStyle: "short",
+      timeZone: "Europe/Berlin",
+    })
     : null;
 const mins = (sec) => (sec == null ? null : Math.round(sec / 60));
 
@@ -62,7 +63,8 @@ if (cmd === "find") {
   console.log(
     JSON.stringify(list.map((s) => ({ id: s.id, name: s.name, type: s.type })), null, 2),
   );
-} else if (cmd === "journeys") {
+}
+else if (cmd === "journeys") {
   const fromQ = process.argv[3];
   const toQ = process.argv[4];
   if (!fromQ || !toQ)
@@ -93,18 +95,19 @@ if (cmd === "find") {
           l.walking
             ? { walk: true, from: l.origin?.name, to: l.destination?.name }
             : {
-                line: l.line?.name,
-                from: l.origin?.name,
-                dep: fmtTime(l.departure || l.plannedDeparture),
-                to: l.destination?.name,
-                arr: fmtTime(l.arrival || l.plannedArrival),
-              },
+              line: l.line?.name,
+              from: l.origin?.name,
+              dep: fmtTime(l.departure || l.plannedDeparture),
+              to: l.destination?.name,
+              arr: fmtTime(l.arrival || l.plannedArrival),
+            },
         ),
       };
     }),
   };
   console.log(JSON.stringify(out, null, 2));
-} else if (cmd === "departures") {
+}
+else if (cmd === "departures") {
   const q = process.argv[3];
   if (!q) die('usage: transit.mjs departures "<station>" [--duration MIN] [--results N]');
   const stop = await resolveStop(q);
@@ -124,7 +127,8 @@ if (cmd === "find") {
     })),
   };
   console.log(JSON.stringify(out, null, 2));
-} else {
+}
+else {
   die(
     'commands: find "<q>" | journeys "<from>" "<to>" [--when ISO] [--results N] | departures "<station>" [--duration MIN] [--results N]',
   );
