@@ -44,13 +44,67 @@ skills are picked up on the **next** Core session (skills are scanned at startup
        comma instead (use em-dashes/quotes freely; just not `: `).
    - **Don't put a stray `.md` file at the root of `custom_skills/`** — pi treats any root `*.md`
      in a skills folder as a skill. Each skill is its own subfolder `custom_skills/<name>/SKILL.md`.
-   - Body: clear steps, with runnable `bash` blocks. If it needs a script, draft that too.
+   - Body: clear steps with runnable `bash` blocks; draft any script too. Follow **Writing a
+     good skill** and **Scripts in skills** (below) for what makes the description and body work.
 3. **Show the user the full `SKILL.md` (and any script) and get explicit approval BEFORE
    writing anything.** Never write-and-run silently.
 4. **On approval, write** to `/app/storage/custom_skills/<name>/SKILL.md` (and scripts in the
    same folder). In the skill's bash, reference its own files by **absolute path**
    `/app/storage/custom_skills/<name>/<file>`.
 5. Confirm what you created and remind the user it's active **next session**.
+
+## Writing a good skill
+
+A skill works by **progressive disclosure**: Core sees only every skill's `name` + `description`
+up front, and loads the full `SKILL.md` body *only when the description matches the task*. So the
+two halves have different jobs.
+
+**The `description` is the trigger — it carries the whole burden of *when* the skill fires.**
+- Write it imperatively, from the user's intent: "Use when the user wants to …". List the
+  concrete phrasings/situations that should trigger it — **including ones that don't name the
+  domain** (a receipt photo, not just "log an expense"). Lean toward being a little pushy.
+- Describe *when to use it*, not the internal mechanics. Keep it tight (hard limit 1024 chars).
+- (Recall the YAML gotcha above: one line, no raw `: ` inside it.)
+
+**The body teaches Core *how* — spend its context wisely.** Once loaded it competes for attention
+with everything else, so:
+- **Add what Core wouldn't know** (this project's conventions, the CLI's exact flags, domain
+  edge cases); **omit what it already knows** (don't explain what a PDF or HTTP is).
+- **Moderate detail beats exhaustive.** Concise stepwise guidance plus one working example
+  outperforms covering every case. **State each rule once** — repetition and over-bolding bury
+  the signal. Trust Core's judgment for the rest.
+- **Give a default, not a menu.** Pick the right tool/approach and mention alternatives briefly,
+  rather than listing equal options. Favour reusable *procedures* over one-off answers.
+- **Match specificity to fragility.** Be prescriptive where a step is fragile, irreversible, or
+  order-dependent ("run exactly this command"); stay loose — and explain the *why* — where
+  several approaches are fine.
+- **Gotchas are the highest-value content** — concrete, non-obvious environment facts Core would
+  otherwise get wrong (e.g. "Sonos name-discovery fails in the container — always target by IP").
+  Keep them in `SKILL.md`. When a real run exposes a mistake, add the correction here.
+- **Keep `SKILL.md` focused** (the spec guideline is < ~500 lines / 5k tokens — every current
+  skill is well under). If one genuinely needs a lot of reference material, put it in a sibling
+  file and tell Core **when** to read it ("read `errors.md` if the API returns non-200"), instead
+  of loading it all up front.
+
+**Ground it in reality.** The best skills come from a real task you just did — capture the steps
+that worked and the corrections you made, not generic "best practice" filler. Refine against real
+runs over time.
+
+## Scripts in skills
+
+Prefer a small **bundled script** over a long inline sequence of shell commands whenever the logic
+is fragile or repeated (this project already does this — one `*.mjs` per skill). List the scripts
+in `SKILL.md` and call them by **absolute path**: `/app/.pi/skills/<name>/<file>` for curated
+skills, `/app/storage/custom_skills/<name>/<file>` for your own (Core runs them from there).
+
+Design scripts for an agent to drive:
+- **Never interactive** — take input via flags/args/env, never a prompt (a non-interactive shell
+  will hang). On missing input, exit with a clear usage error.
+- **Structured output**: print data (JSON) to **stdout**, diagnostics/progress to **stderr**, so
+  Core can parse the result cleanly. Keep output bounded (summarise/limit huge results).
+- **Helpful errors**: say what went wrong and what to do next — the message shapes Core's next try.
+- **Be safe**: idempotent where possible, and gate destructive/outward actions behind explicit
+  confirmation (mirror the "confirm before writing" pattern the data skills use).
 
 ## Modifying one of your own skills (already in custom_skills)
 
