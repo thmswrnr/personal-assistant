@@ -16,6 +16,11 @@ set -euo pipefail
 cd "$(dirname "$0")"
 
 MODEL="local/local-model"
+# Models offered for in-session Ctrl+P switching (local ↔ remote Alan). The boss starts on
+# $MODEL; switching it mid-session also moves inherit-type subagents. Alan needs ALAN_API_KEY
+# in .env (see README → "Remote Alan models"). Harmless if Alan isn't configured — it just
+# won't authenticate when selected.
+MODELS="local/*,alan/*"
 CONTAINER="core_harness"
 # Context-saver extension: spills large JSON tool output to a file (the model queries it
 # with jq) to keep context lean. Auto-discovery doesn't load .mjs, so pass it explicitly.
@@ -47,17 +52,17 @@ case "${1:-}" in
     # Resume the last session (optionally with an opening message) — pi's native --continue.
     shift
     if [ $# -gt 0 ]; then
-      exec docker exec "${TTY[@]}" "$CONTAINER" pi -e "$EXT" --continue "$*" --model "$MODEL"
+      exec docker exec "${TTY[@]}" "$CONTAINER" pi -e "$EXT" --continue "$*" --model "$MODEL" --models "$MODELS"
     else
-      exec docker exec "${TTY[@]}" "$CONTAINER" pi -e "$EXT" --continue --model "$MODEL"
+      exec docker exec "${TTY[@]}" "$CONTAINER" pi -e "$EXT" --continue --model "$MODEL" --models "$MODELS"
     fi
     ;;
   "")
     # New interactive session.
-    exec docker exec "${TTY[@]}" "$CONTAINER" pi -e "$EXT" --model "$MODEL"
+    exec docker exec "${TTY[@]}" "$CONTAINER" pi -e "$EXT" --model "$MODEL" --models "$MODELS"
     ;;
   *)
     # New interactive session, seeded with an opening prompt.
-    exec docker exec "${TTY[@]}" "$CONTAINER" pi -e "$EXT" --model "$MODEL" "$*"
+    exec docker exec "${TTY[@]}" "$CONTAINER" pi -e "$EXT" --model "$MODEL" --models "$MODELS" "$*"
     ;;
 esac
