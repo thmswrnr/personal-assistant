@@ -21,6 +21,51 @@
           "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 }
         }
       ]
+    },
+
+    // Remote provider: Comma-Soft Alan's OpenAI-compatible endpoint (the same backend the
+    // `alan` skill talks to, different surface). Gives Core/subagents stronger remote models so
+    // parallel subagents actually run concurrently instead of queuing on the single local GPU.
+    // The key is read from $ALAN_API_KEY (loaded into the container from .env via env_file) —
+    // never inline it here; this file is version-controlled. baseUrl omits /chat/completions
+    // (pi appends it). gpt-5.4 is listed but the upstream endpoint currently 500s for it.
+    "alan": {
+      "baseUrl": "https://dev.alan.de/api/v1/oai",
+      "api": "openai-completions",
+      "apiKey": "$ALAN_API_KEY",
+      "compat": {
+        "supportsDeveloperRole": false,
+        "supportsReasoningEffort": false
+      },
+      "models": [
+        {
+          "id": "comma-soft/gemma4-31b-instant",
+          "name": "Alan Gemma 4 31B Instant (remote)",
+          "reasoning": false,
+          "input": ["text"],
+          "contextWindow": 128000,
+          "maxTokens": 4096,
+          "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 }
+        },
+        {
+          "id": "comma-soft/gemma4-31b",
+          "name": "Alan Gemma 4 31B Thinking (remote)",
+          "reasoning": true,
+          "input": ["text"],
+          "contextWindow": 128000,
+          "maxTokens": 4096,
+          "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 }
+        },
+        {
+          "id": "openai/gpt-5.4",
+          "name": "Alan GPT-5.4 (remote, frontier)",
+          "reasoning": true,
+          "input": ["text"],
+          "contextWindow": 200000,
+          "maxTokens": 8192,
+          "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 }
+        }
+      ]
     }
   }
 }

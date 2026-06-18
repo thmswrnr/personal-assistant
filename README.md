@@ -375,6 +375,22 @@ Then **register** it (downloading alone isn't enough):
 pi is natively multi-provider: add the API key to `.env`, add a provider/model entry, and
 select it (e.g. `pi --provider google --model gemini-2.x-...`). No code change.
 
+### Remote Alan models (the `alan` provider)
+A second provider is pre-wired in `data/pi/models.json`: **`alan`**, Comma-Soft Alan's
+OpenAI-compatible endpoint (the same backend the `alan` skill uses, exposed as model APIs). It
+gives Core and its [subagents](#subagents-parallel-delegation) stronger remote models — so
+parallel subagents run truly concurrently instead of queuing on the single local GPU. Set
+`ALAN_API_KEY` in `.env` (setup.sh prompts for it; the key never goes in `models.json`, only the
+`$ALAN_API_KEY` reference does), then:
+
+```bash
+docker exec core_harness pi --list-models | grep alan
+docker exec core_harness pi --provider alan --model comma-soft/gemma4-31b-instant -p "hi"
+```
+
+Available ids: `comma-soft/gemma4-31b-instant` (fast), `comma-soft/gemma4-31b` (thinking), and
+`openai/gpt-5.4` (frontier — currently returns a 500 upstream).
+
 ---
 
 ## Troubleshooting

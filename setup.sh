@@ -116,6 +116,17 @@ if yesno "Google suite (Gmail / Drive / Calendar / YouTube)?"; then
   info "  2. Run on the host:  node scripts/google-oauth.mjs   (see README → Google setup)"
 fi
 
+# Comma-Soft Alan — one key serves both the `alan` skill (reads the secrets file) and the `alan`
+# pi provider (reads $ALAN_API_KEY from .env via env_file; see data/pi/models.json). Write both.
+if yesno "Comma-Soft Alan (remote models for Core/subagents + the alan skill)?"; then
+  a="$(askval "Alan API key (Bearer — Alan → user settings → API keys)" secret)"
+  if [ -n "$a" ]; then
+    printf '%s\n' "$a" > data/secrets/alan_api_key
+    set_env ALAN_API_KEY "$a"
+    ok "Alan key saved (data/secrets/alan_api_key + .env ALAN_API_KEY)"
+  else warn "no key — Alan left off"; fi
+fi
+
 # ── 6. Build & start ──────────────────────────────────────────────────────────────────
 bold "6/6  Build & start"
 
