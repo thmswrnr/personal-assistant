@@ -15,9 +15,8 @@ RUN apt-get update && apt-get install -y \
     ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
-# Install the Pi Coding Agent and ACPX (headless bridge), pinned to tested versions.
-# acpx is alpha and changes frequently, so pinning here is what keeps rebuilds stable.
-RUN npm install -g @earendil-works/pi-coding-agent@0.79.1 acpx@0.10.0
+# Install the Pi Coding Agent, pinned to a tested version.
+RUN npm install -g @earendil-works/pi-coding-agent@0.79.1
 
 # yt-dlp (pinned) for the youtube skill — self-contained Linux binary, no Python/ffmpeg.
 # The skill downloads only caption tracks and cleans them to text in Node.

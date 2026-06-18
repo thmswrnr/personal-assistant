@@ -10,40 +10,12 @@
 // Auth: reads the refresh token from $GOOGLE_OAUTH_FILE (default
 // /app/secrets/google_oauth.json), mints a short-lived access token, and calls
 // the API. The token never appears in the agent's context.
-import { readFileSync } from "node:fs";
-
-// Shared Google OAuth token (Gmail + Drive + Calendar + YouTube).
-const OAUTH_FILE = process.env.GOOGLE_OAUTH_FILE ?? "/app/secrets/google_oauth.json";
+import { accessToken } from "../../_shared/google-auth.mjs";
 const API = "https://gmail.googleapis.com/gmail/v1/users/me";
 
 function die(msg) {
   console.error(`gmail: ${msg}`);
   process.exit(1);
-}
-
-async function accessToken() {
-  let creds;
-  try {
-    creds = JSON.parse(readFileSync(OAUTH_FILE, "utf8"));
-  }
-  catch {
-    die(`could not read credentials at ${OAUTH_FILE} — run scripts/google-oauth.mjs first`);
-  }
-  const body = new URLSearchParams({
-    grant_type: "refresh_token",
-    client_id: creds.client_id,
-    client_secret: creds.client_secret,
-    refresh_token: creds.refresh_token,
-  });
-  const res = await fetch(creds.token_uri ?? "https://oauth2.googleapis.com/token", {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body,
-  });
-  if (!res.ok) die(`token refresh failed: ${res.status} ${await res.text()}`);
-  const j = await res.json();
-  if (!j.access_token) die("token refresh returned no access_token");
-  return j.access_token;
 }
 
 async function api(path, token) {
@@ -175,7 +147,7 @@ async function cmdRead(token, id) {
 }
 
 const [cmd, ...rest] = process.argv.slice(2);
-const token = await accessToken();
+const token = await accessToken().catch((e) => die(e.message));
 let result;
 switch (cmd) {
   case "labels":

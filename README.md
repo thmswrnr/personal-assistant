@@ -123,7 +123,7 @@ Stop: `docker compose down`.
 | Host path | In `core` | Purpose |
 |---|---|---|
 | `data/pi/` | `/app/.pi` | pi config: `models.json`, `SYSTEM.md`, `extensions/`, plus pi runtime (`sessions/`, …) |
-| `data/storage/` | `/app/storage` | your files: `inbox/`, `artefacts/` (the second brain), `processed/`, `projects/` (per-project `plan.md` + `todos.md`), `schedule.json`, `memory/` (long-term facts), `custom_skills/` (Core's own writable skills — see `skill-builder`). The main to-do list lives in Google Tasks, not here. |
+| `data/storage/` | `/app/storage` | your files: `inbox/`, `artefacts/` (the second brain), `archived/`, `projects/` (per-project `plan.md` + `todos.md`), `schedule.json`, `memory/` (long-term facts), `custom_skills/` (Core's own writable skills — see `skill-builder`). The main to-do list lives in Google Tasks, not here. |
 | `data/secrets/` | `/app/secrets` | OAuth creds / tokens (git-ignored) |
 | `data/models/` | `/models` (in `llm`) | the GGUF model files |
 | `skills/` | `/app/.pi/skills` | `SKILL.md` capability packages (version-controlled) |

@@ -7,39 +7,12 @@
 // Commands:
 //   node feed.mjs subscriptions          # channels the user is subscribed to
 //   node feed.mjs feed [days]            # recent uploads across subscriptions (default 7)
-import { readFileSync } from "node:fs";
-
-const OAUTH_FILE = process.env.GOOGLE_OAUTH_FILE ?? "/app/secrets/google_oauth.json";
+import { accessToken } from "../../_shared/google-auth.mjs";
 const API = "https://www.googleapis.com/youtube/v3";
 
 function die(msg) {
   console.error(`youtube: ${msg}`);
   process.exit(1);
-}
-
-async function accessToken() {
-  let creds;
-  try {
-    creds = JSON.parse(readFileSync(OAUTH_FILE, "utf8"));
-  }
-  catch {
-    die(`could not read credentials at ${OAUTH_FILE} — run scripts/google-oauth.mjs first`);
-  }
-  const body = new URLSearchParams({
-    grant_type: "refresh_token",
-    client_id: creds.client_id,
-    client_secret: creds.client_secret,
-    refresh_token: creds.refresh_token,
-  });
-  const res = await fetch(creds.token_uri ?? "https://oauth2.googleapis.com/token", {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body,
-  });
-  if (!res.ok) die(`token refresh failed: ${res.status} ${await res.text()}`);
-  const j = await res.json();
-  if (!j.access_token) die("token refresh returned no access_token");
-  return j.access_token;
 }
 
 async function apiJson(path, token) {
@@ -107,7 +80,7 @@ async function channelUploads(channelId) {
 }
 
 const [cmd, arg] = process.argv.slice(2);
-const token = await accessToken();
+const token = await accessToken().catch((e) => die(e.message));
 
 if (cmd === "subscriptions") {
   const subs = await getSubscriptions(token);

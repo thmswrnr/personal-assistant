@@ -10,40 +10,13 @@
 //   node docs.mjs append <id> "<text>"                         # add text at the end
 //
 // Note: cannot DELETE a doc (that needs Drive write scope) — do that in the Drive UI.
-import { readFileSync } from "node:fs";
-
-const OAUTH_FILE = process.env.GOOGLE_OAUTH_FILE ?? "/app/secrets/google_oauth.json";
+import { accessToken } from "../../_shared/google-auth.mjs";
 const DOCS = "https://docs.googleapis.com/v1/documents";
 const DRIVE = "https://www.googleapis.com/drive/v3/files";
 
 function die(msg) {
   console.error(`docs: ${msg}`);
   process.exit(1);
-}
-
-async function accessToken() {
-  let creds;
-  try {
-    creds = JSON.parse(readFileSync(OAUTH_FILE, "utf8"));
-  }
-  catch {
-    die(`could not read credentials at ${OAUTH_FILE} — run scripts/google-oauth.mjs first`);
-  }
-  const body = new URLSearchParams({
-    grant_type: "refresh_token",
-    client_id: creds.client_id,
-    client_secret: creds.client_secret,
-    refresh_token: creds.refresh_token,
-  });
-  const res = await fetch(creds.token_uri ?? "https://oauth2.googleapis.com/token", {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body,
-  });
-  if (!res.ok) die(`token refresh failed: ${res.status} ${await res.text()}`);
-  const j = await res.json();
-  if (!j.access_token) die("token refresh returned no access_token");
-  return j.access_token;
 }
 
 async function api(url, token, { method = "GET", body } = {}) {
@@ -91,7 +64,7 @@ async function appendText(token, id, text) {
 
 const f = parseFlags(process.argv.slice(2));
 const cmd = f._[0];
-const token = await accessToken();
+const token = await accessToken().catch((e) => die(e.message));
 
 if (cmd === "create") {
   const title = f._[1];

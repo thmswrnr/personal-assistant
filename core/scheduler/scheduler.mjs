@@ -110,18 +110,35 @@ async function enqueue(label, prompt) {
 }
 
 function loadSchedule() {
+  let raw;
   try {
-    const j = JSON.parse(readFileSync(FILE, "utf8"));
-    return Array.isArray(j) ? j : [];
-  } catch {
-    return []; // missing/invalid file = nothing scheduled
+    raw = readFileSync(FILE, "utf8");
   }
+  catch (err) {
+    // A missing file is the normal "no schedule yet" case — stay quiet. Anything else
+    // (e.g. a permissions problem) is worth surfacing in the logs.
+    if (err.code !== "ENOENT") log(`warning: could not read ${FILE}: ${err.message}`);
+    return [];
+  }
+  let j;
+  try {
+    j = JSON.parse(raw);
+  }
+  catch (err) {
+    log(`warning: ${FILE} is not valid JSON (${err.message}) — nothing scheduled`);
+    return [];
+  }
+  if (!Array.isArray(j)) {
+    log(`warning: ${FILE} must be a JSON array of jobs — nothing scheduled`);
+    return [];
+  }
+  return j;
 }
 
 const lastFired = {}; // label → "YYYY-MM-DDTHH:MM" so each job fires at most once per minute
 function tick() {
   const now = new Date();
-  const minute = now.toString().slice(0, 21); // coarse minute key (local)
+  const minute = now.toISOString().slice(0, 16); // per-minute dedup key, e.g. "2026-06-18T12:03"
   loadSchedule().forEach((e, i) => {
     if (!e || !e.prompt || !e.cron) return;
     const key = e.label || `job${i}`;

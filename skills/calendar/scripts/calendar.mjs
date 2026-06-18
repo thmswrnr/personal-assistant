@@ -15,39 +15,12 @@
 // <when> = "YYYY-MM-DD" (all-day) or "YYYY-MM-DDTHH:MM" (timed; default tz Europe/Berlin).
 // list/agenda/today/search return each event's `id` (use it for edit/rm).
 // All commands use the "primary" calendar unless --calendar <id> is given.
-import { readFileSync } from "node:fs";
-
-const OAUTH_FILE = process.env.GOOGLE_OAUTH_FILE ?? "/app/secrets/google_oauth.json";
+import { accessToken } from "../../_shared/google-auth.mjs";
 const CAL = "https://www.googleapis.com/calendar/v3";
 
 function die(msg) {
   console.error(`calendar: ${msg}`);
   process.exit(1);
-}
-
-async function accessToken() {
-  let creds;
-  try {
-    creds = JSON.parse(readFileSync(OAUTH_FILE, "utf8"));
-  }
-  catch {
-    die(`could not read credentials at ${OAUTH_FILE} — run scripts/google-oauth.mjs first`);
-  }
-  const body = new URLSearchParams({
-    grant_type: "refresh_token",
-    client_id: creds.client_id,
-    client_secret: creds.client_secret,
-    refresh_token: creds.refresh_token,
-  });
-  const res = await fetch(creds.token_uri ?? "https://oauth2.googleapis.com/token", {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body,
-  });
-  if (!res.ok) die(`token refresh failed: ${res.status} ${await res.text()}`);
-  const j = await res.json();
-  if (!j.access_token) die("token refresh returned no access_token");
-  return j.access_token;
 }
 
 async function apiJson(url, token) {
@@ -203,7 +176,7 @@ async function cmdDelete(token, calendarId, f) {
 const f = parseFlags(process.argv.slice(2));
 const cmd = f._[0];
 const calendarId = f.calendar || "primary";
-const token = await accessToken();
+const token = await accessToken().catch((e) => die(e.message));
 let result;
 switch (cmd) {
   case "list":

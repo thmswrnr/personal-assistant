@@ -35,6 +35,17 @@ const API = `https://api.telegram.org/bot${TOKEN}`;
 // notes are transcribed by the main model — no separate STT service.
 const LLM_URL = process.env.LLM_URL ?? "http://llm:8080/v1/chat/completions";
 
+// Tunables. Telegram caps a message at 4096 chars; we slice a little below that and only
+// break on a newline once past TG_CHUNK_MIN_BREAK, so an HTML tag or word is never cut.
+const TG_MSG_LIMIT = 4096;            // Telegram's hard per-message character limit
+const TG_CHUNK = 4000;                // safe slice size when splitting a long reply
+const TG_CHUNK_MIN_BREAK = 2000;      // below this, force a hard cut instead of hunting for "\n"
+const AGENT_TIMEOUT_MS = 180000;      // kill a Core run that hasn't finished in 3 min
+const TYPING_PING_MS = 4000;          // re-send "typing…" before Telegram's ~5s indicator expires
+const EDIT_THROTTLE_MS = 800;         // min gap between live status edits (Telegram edit rate)
+const POLL_WAIT_SECS = 30;            // getUpdates long-poll hold time
+const POLL_FETCH_TIMEOUT_MS = 40000;  // fetch abort > long-poll hold, so the hold can complete
+
 const log = (...a) => console.log("[bot]", ...a);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -77,7 +88,7 @@ async function tg(method, body) {
 // Send a message, return its message_id (for later editing).
 async function sendMsg(chatId, text) {
   try {
-    const r = await tg("sendMessage", { chat_id: chatId, text: (text || "(no output)").slice(0, 4096) });
+    const r = await tg("sendMessage", { chat_id: chatId, text: (text || "(no output)").slice(0, TG_MSG_LIMIT) });
     return r?.result?.message_id;
   } catch (e) {
     log("sendMsg error:", e.message);
@@ -90,7 +101,7 @@ async function sendMsg(chatId, text) {
 // so a converter slip never leaves the user staring at a stuck "Working…" message.
 async function editMsg(chatId, id, text, parseMode) {
   if (!id) return void (await send(chatId, text));
-  const t = (text || "(no output)").slice(0, 4096);
+  const t = (text || "(no output)").slice(0, TG_MSG_LIMIT);
   const payload = { chat_id: chatId, message_id: id, text: t };
   if (parseMode) payload.parse_mode = parseMode;
   try { await tg("editMessageText", payload); }
@@ -106,8 +117,8 @@ async function editMsg(chatId, id, text, parseMode) {
 // Plain send, chunked to Telegram's 4096-char limit.
 async function send(chatId, text) {
   const t = text || "(no output)";
-  for (let i = 0; i < t.length; i += 4000) {
-    try { await tg("sendMessage", { chat_id: chatId, text: t.slice(i, i + 4000) }); }
+  for (let i = 0; i < t.length; i += TG_CHUNK) {
+    try { await tg("sendMessage", { chat_id: chatId, text: t.slice(i, i + TG_CHUNK) }); }
     catch (e) { log("send error:", e.message); }
   }
 }
@@ -118,12 +129,12 @@ async function send(chatId, text) {
 // boundary so an HTML tag is never cut in two. editMsg falls back to plain on an HTML error.
 async function editOrSend(chatId, id, text, parseMode) {
   text = text || "(no output)";
-  if (text.length <= 4096) return void (await editMsg(chatId, id, text, parseMode));
+  if (text.length <= TG_MSG_LIMIT) return void (await editMsg(chatId, id, text, parseMode));
   const pieces = [];
   let rest = text;
-  while (rest.length > 4000) {
-    let cut = rest.lastIndexOf("\n", 4000);
-    if (cut < 2000) cut = 4000;
+  while (rest.length > TG_CHUNK) {
+    let cut = rest.lastIndexOf("\n", TG_CHUNK);
+    if (cut < TG_CHUNK_MIN_BREAK) cut = TG_CHUNK;
     pieces.push(rest.slice(0, cut));
     rest = rest.slice(cut).replace(/^\n+/, "");
   }
@@ -139,7 +150,7 @@ async function editOrSend(chatId, id, text, parseMode) {
 function keepTyping(chatId) {
   const ping = () => tg("sendChatAction", { chat_id: chatId, action: "typing" }).catch(() => {});
   ping();
-  const iv = setInterval(ping, 4000);
+  const iv = setInterval(ping, TYPING_PING_MS);
   return () => clearInterval(iv);
 }
 
@@ -172,8 +183,8 @@ function runAgent(prompt, imagePath, handlers = {}, sessionId) {
     const finish = (r) => { if (done) return; done = true; clearTimeout(timer); resolve(r); };
     const timer = setTimeout(() => {
       try { process.kill(-p.pid, "SIGKILL"); } catch { try { p.kill("SIGKILL"); } catch { /* gone */ } }
-      finish({ code: -1, err: "timed out after 180s" });
-    }, 180000);
+      finish({ code: -1, err: `timed out after ${AGENT_TIMEOUT_MS / 1000}s` });
+    }, AGENT_TIMEOUT_MS);
     p.stdout.on("data", (d) => {
       buf += d;
       let nl;
@@ -298,7 +309,7 @@ async function enqueue(chatId, job) {
       const render = async (force) => {
         const now = Date.now();
         // Throttle repaints to stay under Telegram's edit rate (~800ms).
-        if (!force && now - lastEdit < 800) return;
+        if (!force && now - lastEdit < EDIT_THROTTLE_MS) return;
         if (current === lastShown) return;
         lastShown = current; lastEdit = now;
         await editMsg(j.chatId, statusId, current);
@@ -332,7 +343,7 @@ async function poll() {
   let offset = 0;
   for (;;) {
     try {
-      const res = await fetch(`${API}/getUpdates?timeout=30&offset=${offset}`, { signal: AbortSignal.timeout(40000) });
+      const res = await fetch(`${API}/getUpdates?timeout=${POLL_WAIT_SECS}&offset=${offset}`, { signal: AbortSignal.timeout(POLL_FETCH_TIMEOUT_MS) });
       const j = await res.json();
       for (const u of j.result ?? []) {
         offset = u.update_id + 1;
