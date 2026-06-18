@@ -186,6 +186,30 @@ no separate speech-to-text service).
 
 ---
 
+## Subagents (parallel delegation)
+
+Core can act as a **boss agent**: when a task splits into independent pieces (research several
+sources at once, process several items), it decides on its own to hand them to **parallel
+subagents**, then collects and synthesizes the results — you only ever talk to Core. This is
+provided by the [`@tintinweb/pi-subagents`](https://www.npmjs.com/package/@tintinweb/pi-subagents)
+pi extension (a Claude Code-style `Agent` tool), installed by `setup.sh` (pinned).
+
+Unlike the bundled `extensions/` (loaded explicitly with `-e`, e.g. context-saver), this is an
+installed **pi package**: `setup.sh` runs `pi install` once, which registers it in
+`data/pi/settings.json` so pi **auto-loads it on every run** — CLI, the Telegram bridge, and
+scheduled jobs alike. No launcher flags needed. To (re)install by hand:
+
+```bash
+docker exec core_harness pi install npm:@tintinweb/pi-subagents@0.10.3
+```
+
+Delegation is the model's own call (guided by an instruction in `data/pi/SYSTEM.md`), so how
+readily it happens tracks the boss model's judgement. On the local 12 B, subagents also share the
+single GPU, so parallel ones queue rather than run truly concurrently — the wall-clock win comes
+when subagents run on a stronger/remote model, which the boss model is free to use.
+
+---
+
 ## Memory (long-term)
 
 Core runs are **stateless** — every command, scheduled job, and Telegram message is a fresh `pi`

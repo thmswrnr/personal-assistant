@@ -133,12 +133,25 @@ else
   grep -q custom_skills "$SETTINGS" || warn "Add \"/app/storage/custom_skills\" to the \"skills\" array in $SETTINGS to enable self-written skills."
 fi
 
+# Subagent delegation extension (pinned). Lets Core act as a boss agent that fans independent
+# work out to parallel subagents. It's a pi package, so it installs into the bind-mounted
+# data/pi (settings.json + npm/ — both gitignored runtime state) and pi auto-discovers it on
+# every run; that means it must be (re)installed per clone, here. Idempotent.
+SUBAGENTS_PKG="npm:@tintinweb/pi-subagents@0.10.3"
+
 PROFILE=(); [ "$USE_TELEGRAM" = yes ] && PROFILE=(--profile telegram)
 if yesno "Build the image and start the stack now?" y; then
   $DC "${PROFILE[@]}" up -d --build
   ok "stack starting (first run loads the models — gated by a healthcheck, ~30–60s)"
+  if docker exec core_harness pi install "$SUBAGENTS_PKG" >/dev/null 2>&1; then
+    ok "subagent extension installed ($SUBAGENTS_PKG)"
+  else
+    warn "couldn't install the subagent extension now — run it later:"
+    info "  docker exec core_harness pi install $SUBAGENTS_PKG"
+  fi
 else
   info "When ready:  $DC ${PROFILE[*]} up -d --build"
+  info "Then enable subagents:  docker exec core_harness pi install $SUBAGENTS_PKG"
 fi
 
 bold "Done."
