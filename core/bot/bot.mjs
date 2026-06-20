@@ -19,12 +19,15 @@ import { writeFileSync, readFileSync, rmSync, readdirSync } from "node:fs";
 
 const TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const ALLOWED = process.env.TELEGRAM_CHAT_ID ? String(process.env.TELEGRAM_CHAT_ID) : "";
-const MODEL = process.env.CORE_MODEL ?? "local/local-model";
 const EXT = "/app/.pi/extensions/context-saver.mjs";
 // Appended to Core's system prompt for bot runs only (the CLI stays plain markdown): the reply
 // is rendered in Telegram, which supports a small HTML subset. Keep this strict — invalid HTML
 // makes Telegram reject the message (we then fall back to plain, showing raw tags).
 const TG_FORMAT =
+  "Your reply is the ONLY thing the user sees — it must contain just the final answer addressed " +
+  "to them. NEVER put your reasoning, planning, self-talk, or step-by-step thinking in the reply " +
+  "(no \"The user wants…\", \"I should…\", \"Wait…\", \"Plan:\", \"Command:\"); keep all of that in " +
+  "your private reasoning. " +
   "OUTPUT FORMAT: your reply is shown in Telegram. Format it with ONLY these HTML tags: " +
   "<b>bold</b>, <i>italic</i>, <u>underline</u>, <s>strike</s>, <code>inline code</code>, " +
   "<pre>code block</pre>, <a href=\"url\">link</a>. Do NOT use Markdown (no **, ##, backticks, " +
@@ -68,6 +71,55 @@ function resetSession(chatId) {
   } catch { /* dir may not exist yet — nothing to reset */ }
   return n;
 }
+
+// ---- model selection (switchable from Telegram via /model) ----
+// The switchable list is the single source of truth in models.json (pi's config dir). The id
+// we pass to `pi --model` is "<provider>/<model.id>" (e.g. local/local-model,
+// alan/comma-soft/gemma4-31b) — the same form core.sh uses.
+const MODELS_JSON = "/app/.pi/models.json";
+
+// models.json is authored with // comments and trailing-comment lines, which JSON.parse
+// rejects. Strip line comments in a string-aware pass so the "//" inside URLs (http://…)
+// is preserved.
+function stripJsonComments(src) {
+  let out = "", inStr = false, quote = "";
+  for (let i = 0; i < src.length; i++) {
+    const c = src[i], n = src[i + 1];
+    if (inStr) {
+      out += c;
+      if (c === "\\") { out += src[++i] ?? ""; continue; }
+      if (c === quote) inStr = false;
+      continue;
+    }
+    if (c === '"' || c === "'") { inStr = true; quote = c; out += c; continue; }
+    if (c === "/" && n === "/") { while (i < src.length && src[i] !== "\n") i++; out += "\n"; continue; }
+    out += c;
+  }
+  return out;
+}
+
+// Flatten models.json → [{ id: "provider/modelId", name }]. Falls back to just the local
+// model if the file can't be read/parsed, so /model never crashes the bot.
+function loadModels() {
+  try {
+    const cfg = JSON.parse(stripJsonComments(readFileSync(MODELS_JSON, "utf8")));
+    const out = [];
+    for (const [provider, p] of Object.entries(cfg.providers ?? {})) {
+      for (const m of p.models ?? []) out.push({ id: `${provider}/${m.id}`, name: m.name || m.id });
+    }
+    if (out.length) return out;
+  } catch (e) {
+    log("loadModels error:", e?.message ?? e);
+  }
+  return [{ id: "local/local-model", name: "Gemma 4 12B (local)" }];
+}
+
+const MODELS = loadModels();
+// Each bot start begins on the default model (local), just like the CLI — a /model switch
+// lasts only for the running process and resets on restart. No persistence.
+let activeModel = process.env.CORE_MODEL ?? "local/local-model";
+const modelName = (id) => MODELS.find((m) => m.id === id)?.name ?? id;
+function setModel(id) { activeModel = id; }
 
 if (!TOKEN) {
   log("TELEGRAM_BOT_TOKEN not set — bridge disabled. Set it in .env to enable the phone bridge.");
@@ -123,27 +175,75 @@ async function send(chatId, text) {
   }
 }
 
-// Turn the status message into the final answer; spill overflow to follow-up messages.
-// Core already formats its reply as Telegram HTML (see the bot's appended system prompt), so
-// `parseMode` is just passed through — no conversion here. Overflow is split on a newline
-// boundary so an HTML tag is never cut in two. editMsg falls back to plain on an HTML error.
-async function editOrSend(chatId, id, text, parseMode) {
-  text = text || "(no output)";
-  if (text.length <= TG_MSG_LIMIT) return void (await editMsg(chatId, id, text, parseMode));
+// Reasoning models sometimes leak chain-of-thought into the answer wrapped in <think>…</think>
+// (the system prompt asks them not to; this is the belt-and-braces). Drop those blocks — and a
+// dangling </think> with no opener — so the user never sees raw reasoning. Plain prose reasoning
+// without tags can't be detected here; the system prompt is the primary guard against that.
+function stripThinking(s) {
+  let out = String(s).replace(/<think>[\s\S]*?<\/think>/gi, "");
+  if (/<\/think>/i.test(out) && !/<think>/i.test(out)) out = out.replace(/^[\s\S]*?<\/think>/i, "");
+  return out.replace(/<\/?think>/gi, "").trim();
+}
+
+// Split a long reply into Telegram-sized pieces on a newline boundary (so an HTML tag or
+// word is never cut in two); below TG_CHUNK_MIN_BREAK we force a hard cut instead.
+function chunkText(text) {
   const pieces = [];
-  let rest = text;
+  let rest = text || "(no output)";
   while (rest.length > TG_CHUNK) {
     let cut = rest.lastIndexOf("\n", TG_CHUNK);
     if (cut < TG_CHUNK_MIN_BREAK) cut = TG_CHUNK;
     pieces.push(rest.slice(0, cut));
     rest = rest.slice(cut).replace(/^\n+/, "");
   }
-  if (rest) pieces.push(rest);
+  pieces.push(rest);
+  return pieces;
+}
+
+// Turn the status message into the final answer; spill overflow to follow-up messages.
+// Core already formats its reply as Telegram HTML (see the bot's appended system prompt), so
+// `parseMode` is just passed through — no conversion here. editMsg falls back to plain on
+// an HTML error.
+async function editOrSend(chatId, id, text, parseMode) {
+  const pieces = chunkText(text);
   await editMsg(chatId, id, pieces[0], parseMode);
   for (let i = 1; i < pieces.length; i++) {
     try { await tg("sendMessage", { chat_id: chatId, text: pieces[i], ...(parseMode ? { parse_mode: parseMode } : {}) }); }
     catch (e) { log("send error:", e.message); }
   }
+}
+
+// Post a reply as its OWN message(s) (not an edit), chunked like editOrSend. Used when the
+// activity trail is kept and the answer goes below it. Retries once as plain on an HTML error.
+async function sendHtml(chatId, text, parseMode) {
+  for (const piece of chunkText(text)) {
+    try { await tg("sendMessage", { chat_id: chatId, text: piece, ...(parseMode ? { parse_mode: parseMode } : {}) }); }
+    catch (e) {
+      if (parseMode) {
+        try { await tg("sendMessage", { chat_id: chatId, text: piece }); continue; }
+        catch (e2) { log("send error (plain retry):", e2.message); continue; }
+      }
+      log("send error:", e.message);
+    }
+  }
+}
+
+// ---- model picker (tap-to-switch inline keyboard for /model) ----
+// One button per model from models.json; the active one is marked ●. callback_data carries
+// the model's index (kept well under Telegram's 64-byte limit); the tap is handled in poll().
+function modelPickerMarkup() {
+  return {
+    inline_keyboard: MODELS.map((m, i) => [
+      { text: `${m.id === activeModel ? "● " : "○ "}${m.name}`, callback_data: `m:${i}` },
+    ]),
+  };
+}
+async function sendModelPicker(chatId) {
+  await tg("sendMessage", {
+    chat_id: chatId,
+    text: `🧠 Model — current: ${modelName(activeModel)}\nTap to switch:`,
+    reply_markup: modelPickerMarkup(),
+  });
 }
 
 // Keep the "typing…" indicator alive (Telegram's expires after ~5s). Returns a stop fn.
@@ -176,7 +276,7 @@ async function downloadTgFile(fileId, base) {
 function runAgent(prompt, imagePath, handlers = {}, sessionId) {
   return new Promise((resolve) => {
     const head = sessionId ? ["--mode", "json", "--session-id", sessionId] : ["--mode", "json"];
-    const tail = ["--model", MODEL, "-e", EXT, "--append-system-prompt", TG_FORMAT];
+    const tail = ["--model", activeModel, "-e", EXT, "--append-system-prompt", TG_FORMAT];
     const args = imagePath ? [...head, `@${imagePath}`, prompt, ...tail] : [...head, prompt, ...tail];
     const p = spawn("pi", args, { cwd: "/app", detached: true, stdio: ["ignore", "pipe", "pipe"] });
     let err = "", buf = "", done = false;
@@ -215,14 +315,20 @@ function toolStatus(name, args = {}) {
   // No ellipsis on truncation — the renderer always appends "…", which reads as "in progress".
   const trim = (s, n = 56) => { s = String(s).replace(/\s+/g, " ").trim(); return s.length > n ? s.slice(0, n) : s; };
   const base = (p) => String(p).split("/").filter(Boolean).pop() || String(p);
+  const skillOf = (s) => String(s).match(/\/skills\/([^/]+)\//)?.[1] ?? null; // .../skills/<name>/...
   switch (name) {
     case "bash": {
       const cmd = args.command || "";
-      const skill = cmd.match(/\/skills\/([^/]+)\//); // skills run via bash → name the skill
-      if (skill) return `Running the ${skill[1]} skill`;
+      const skill = skillOf(cmd); // skills run via bash → name the skill
+      if (skill) return `Running the ${skill} skill`;
       return cmd ? `Running ${trim(cmd)}` : "Running a command";
     }
-    case "read": return args.path ? `Reading ${base(args.path)}` : "Reading a file";
+    case "read": {
+      // A skill is loaded by reading its SKILL.md — name the skill, not the file.
+      const skill = skillOf(args.path);
+      if (skill && /SKILL\.md$/i.test(args.path)) return `Loading the ${skill} skill`;
+      return args.path ? `Reading ${base(args.path)}` : "Reading a file";
+    }
     case "write": return args.path ? `Writing ${base(args.path)}` : "Saving a file";
     case "edit": return args.path ? `Editing ${base(args.path)}` : "Editing a file";
     default: return name ? name.charAt(0).toUpperCase() + name.slice(1) : "Working";
@@ -301,31 +407,54 @@ async function enqueue(chatId, job) {
         statusId = await sendMsg(j.chatId, "💭 Thinking…");
       }
       const t0 = process.hrtime.bigint();
-      // Live: ONE message showing a short, stable status — "💭 Thinking…" while the model
-      // reasons or writes, "🔧 <tool>…" while a tool runs — then replaced by the final answer.
-      // Status stays short (no streaming content) so the message doesn't jar between long and
-      // short. The answer is just accumulated; Core formats it as Telegram HTML itself.
-      let answer = "", current = "💭 Thinking…", lastShown = "", lastEdit = 0;
+      const elapsed = () => Math.round(Number(process.hrtime.bigint() - t0) / 1e9);
+      // Live: ONE status message showing the activity TRAIL — each finished tool stays as a
+      // "✓ …" line, with the current phase ("💭 Thinking", "🔧 <tool>", "✍️ Writing") plus
+      // elapsed time on the last line. So you watch Core work step by step. The answer is
+      // accumulated separately; Core formats it as Telegram HTML itself. On completion the
+      // trail collapses to a summary that STAYS above the answer (sent as its own message).
+      const MAX_TRAIL = 8;          // visible "✓ …" lines while live (bounds message length)
+      let answer = "", phase = "thinking", currentTool = null;
+      const steps = [];             // completed step labels, e.g. "Reading config.json"
+      let lastShown = "", lastEdit = 0;
+      // Build the trail lines, capped to the last `max` (older ones folded into a count).
+      const trail = (max) => steps.length <= max ? steps.map((s) => `✓ ${s}`)
+        : [`… (+${steps.length - max} earlier)`, ...steps.slice(-max).map((s) => `✓ ${s}`)];
+      const liveBody = () => {
+        const cur = currentTool ? `🔧 ${currentTool}…`
+          : phase === "writing" ? "✍️ Writing the reply…"
+          : "💭 Thinking…";
+        return [...trail(MAX_TRAIL), `${cur}  ·  ${elapsed()}s`].join("\n");
+      };
       const render = async (force) => {
         const now = Date.now();
         // Throttle repaints to stay under Telegram's edit rate (~800ms).
         if (!force && now - lastEdit < EDIT_THROTTLE_MS) return;
-        if (current === lastShown) return;
-        lastShown = current; lastEdit = now;
-        await editMsg(j.chatId, statusId, current);
+        const body = liveBody();
+        if (body === lastShown) return;
+        lastShown = body; lastEdit = now;
+        await editMsg(j.chatId, statusId, body); // plain text — trail lines may contain < > &
       };
       const sessionId = sessionIdFor(j.chatId); // resume this chat's conversation (bounded; see top)
       const r = await runAgent(prompt, imagePath, {
         onAssistantStart: () => { answer = ""; },
-        onThinking: () => { current = "💭 Thinking…"; render(false); },
-        onDelta: (d) => { answer += d; current = "💭 Thinking…"; render(false); }, // accumulate; status stays generic
-        onTool: (name, args) => { current = `🔧 ${toolStatus(name, args)}…`; render(true); },
-        onToolEnd: () => { current = "💭 Thinking…"; },
+        onThinking: () => { if (!currentTool) phase = "thinking"; render(false); },
+        onDelta: (d) => { answer += d; phase = "writing"; render(false); },
+        onTool: (name, args) => { currentTool = toolStatus(name, args); render(true); },
+        onToolEnd: () => { if (currentTool) steps.push(currentTool); currentTool = null; phase = "thinking"; render(true); },
       }, sessionId);
       const secs = Number(process.hrtime.bigint() - t0) / 1e9;
-      const reply = answer.trim() || (r.code === 0 ? "(no output)" : `⚠️ agent error: ${r.err || "failed"}`);
-      log(`run done in ${secs.toFixed(0)}s: exit=${r.code} out=${reply.length}ch${r.err ? ` err=${r.err.slice(0, 80)}` : ""}`);
-      await editOrSend(j.chatId, statusId, reply, "HTML"); // final answer (Core formats it as Telegram HTML)
+      const reply = stripThinking(answer) || (r.code === 0 ? "(no output)" : `⚠️ agent error: ${r.err || "failed"}`);
+      log(`run done in ${secs.toFixed(0)}s: exit=${r.code} out=${reply.length}ch steps=${steps.length}${r.err ? ` err=${r.err.slice(0, 80)}` : ""}`);
+      if (steps.length) {
+        // Keep the trail: collapse the status message to a summary, then post the answer below.
+        const summary = [...trail(12), `⏱️ Took ${secs.toFixed(0)}s`].join("\n");
+        await editMsg(j.chatId, statusId, summary);
+        await sendHtml(j.chatId, reply, "HTML");
+      } else {
+        // No tools ran — just a clean single answer message (no empty trail).
+        await editOrSend(j.chatId, statusId, reply, "HTML");
+      }
       log(`replied (${reply.length}ch)`);
     } catch (e) {
       log(`job error: ${e?.message ?? e}`);
@@ -347,6 +476,27 @@ async function poll() {
       const j = await res.json();
       for (const u of j.result ?? []) {
         offset = u.update_id + 1;
+        // A model-picker button tap arrives as a callback_query, not a message.
+        const cq = u.callback_query;
+        if (cq) {
+          const cqChat = cq.message?.chat ? String(cq.message.chat.id) : "";
+          if (ALLOWED && cqChat === ALLOWED && cq.data?.startsWith("m:")) {
+            const chosen = MODELS[Number(cq.data.slice(2))];
+            if (chosen) {
+              setModel(chosen.id);
+              log(`model switched to ${chosen.id}`);
+              await tg("editMessageText", {
+                chat_id: cqChat, message_id: cq.message.message_id,
+                text: `🧠 Model — current: ${chosen.name}\n✅ Switched. Tap another to change.`,
+                reply_markup: modelPickerMarkup(),
+              });
+            }
+            await tg("answerCallbackQuery", { callback_query_id: cq.id, text: chosen ? `Switched to ${chosen.name}` : "Unknown model" });
+          } else {
+            await tg("answerCallbackQuery", { callback_query_id: cq.id });
+          }
+          continue;
+        }
         const m = u.message;
         if (!m?.chat) continue;
         const chatId = String(m.chat.id);
@@ -357,6 +507,12 @@ async function poll() {
           const n = resetSession(chatId);
           log(`session reset by user (${n} file(s) deleted)`);
           sendMsg(chatId, "🆕 Fresh start — cleared this conversation.").catch(() => {});
+          continue;
+        }
+        // Show the tap-to-switch model picker.
+        if (m.text && /^\/models?\b/i.test(m.text.trim())) {
+          log("model picker requested");
+          sendModelPicker(chatId).catch((e) => log("picker error:", e?.message ?? e));
           continue;
         }
         if (m.voice || m.audio) { log("voice message"); enqueue(chatId, { voiceFileId: (m.voice || m.audio).file_id }); continue; }
@@ -376,6 +532,6 @@ async function poll() {
   }
 }
 
-log(`starting (model=${MODEL}, chat=${ALLOWED || "UNSET"})`);
+log(`starting (model=${activeModel}, chat=${ALLOWED || "UNSET"})`);
 if (ALLOWED) send(ALLOWED, "✅ Core is online.").catch(() => {});
 poll();

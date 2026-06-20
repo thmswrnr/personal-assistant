@@ -29,13 +29,16 @@ const OUT_FILE = join(SECRETS, "google_oauth.json");
 
 const PORT = 4100;
 const REDIRECT_URI = `http://localhost:${PORT}/oauth2callback`;
-// Scopes for the Google skills. Read-only except: gmail.compose (drafts only — never sends),
-// calendar.events / tasks / spreadsheets / documents (read-write — the calendar/tasks/sheets/
-// docs skills gate every write behind a confirm-with-the-user rule). Add a scope here and
-// re-run this script when a new skill needs it (the consent must cover it).
+// Scopes for the Google skills. Read-only except the read-write ones below (gmail.modify/
+// send, calendar.events, tasks, spreadsheets, documents) — the gmail/calendar/tasks/sheets/
+// docs skills gate every write (send mail, mark read, edit events…) behind a confirm-with-
+// the-user rule. Add a scope here and re-run this script when a new skill needs it (the
+// consent must cover it).
 const SCOPES = [
   "https://www.googleapis.com/auth/gmail.readonly",
-  "https://www.googleapis.com/auth/gmail.compose", // create drafts only (never sends)
+  "https://www.googleapis.com/auth/gmail.compose", // create drafts
+  "https://www.googleapis.com/auth/gmail.modify",  // mark read/unread, label, archive (triage)
+  "https://www.googleapis.com/auth/gmail.send",    // send a draft the user reviewed & approved
   "https://www.googleapis.com/auth/drive.readonly",
   "https://www.googleapis.com/auth/calendar.events", // read + create/edit/delete calendar events
   "https://www.googleapis.com/auth/youtube.readonly",
