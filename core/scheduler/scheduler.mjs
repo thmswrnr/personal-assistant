@@ -26,7 +26,10 @@ import { readFileSync } from "node:fs";
 // Model is pi's own default (settings.json: defaultProvider/defaultModel). Set CORE_MODEL
 // only to override it for scheduled jobs; otherwise we pass no --model and let pi decide.
 const MODEL = process.env.CORE_MODEL ?? "";
-const EXT = "/app/.pi/extensions/context-saver.mjs";
+// Core's context extensions — one dedicated concern each (spill, loop guard, memory). Loaded with
+// one -e apiece (pi's arg parser accepts repeated -e). Compaction stays native to pi.
+const EXT_DIR = "/app/.pi/extensions";
+const EXT_ARGS = ["spill", "loop-guard", "memory"].flatMap((n) => ["-e", `${EXT_DIR}/${n}.mjs`]);
 const FILE = process.env.SCHEDULE_FILE ?? "/app/storage/schedule.json";
 const log = (...a) => console.log("[scheduler]", ...a);
 
@@ -62,7 +65,7 @@ function runAgent(prompt) {
     // stdin MUST be ignored: with an open stdin pipe, `pi -p` runs but then waits on stdin
     // forever and never exits. detached → own process group for timeout-kill.
     // --no-session: scheduled jobs are stateless one-shots — don't leave a session file behind.
-    const args = ["-p", prompt, "--no-session", ...(MODEL ? ["--model", MODEL] : []), "-e", EXT];
+    const args = ["-p", prompt, "--no-session", ...(MODEL ? ["--model", MODEL] : []), ...EXT_ARGS];
     const p = spawn("pi", args, { cwd: "/app", detached: true, stdio: ["ignore", "pipe", "pipe"] });
     let out = "", err = "", done = false;
     const finish = (r) => { if (done) return; done = true; clearTimeout(timer); resolve(r); };

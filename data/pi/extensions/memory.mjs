@@ -6,14 +6,14 @@
 // index is tiny by design; full fact files live under `storage/memory/` and the agent reads
 // only the ones whose description looks relevant — same progressive disclosure as skills.
 //
-// Loaded by being registered from context-saver.mjs (which is already `-e`'d on every entry
-// point: interactive core.sh, the Telegram bot, the scheduler, and one-off runs).
+// One dedicated concern, loaded via its own `-e` on every Core entry point. See also [[spill]],
+// [[loop-guard]], [[compaction]].
 import { readFileSync } from "node:fs";
 
 const DIR = process.env.CORE_MEMORY_DIR ?? "/app/storage/memory";
 const INDEX = `${DIR}/MEMORY.md`;
 
-export function registerMemory(pi) {
+export default function register(pi) {
   // Fires once after the user submits a prompt, before the agent loop. We only extend the
   // system prompt (framing/context), never inject a conversational message — so memory does
   // not bloat the message history or get carried through compaction.

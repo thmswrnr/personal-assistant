@@ -36,7 +36,8 @@ data/pi/*
 # Track our own extension source, but not any runtime files pi drops in extensions/
 !data/pi/extensions/
 data/pi/extensions/*
-!data/pi/extensions/context-saver.mjs
+!data/pi/extensions/spill.mjs
+!data/pi/extensions/loop-guard.mjs
 !data/pi/extensions/memory.mjs
 # Track our custom subagent definitions (they inherit Core's model unless they pin one)
 !data/pi/agents/

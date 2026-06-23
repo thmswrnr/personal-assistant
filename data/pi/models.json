@@ -16,7 +16,7 @@
   // Shipped default: Comma-Soft Alan's OpenAI-compatible endpoint. Change it to your own.
   "providers": {
     "api": {
-      "baseUrl": "https://dev.alan.de/api/v1/oai",
+      "baseUrl": "https://app.alan.de/api/v1/oai",
       "api": "openai-completions",
       "apiKey": "$LLM_API_KEY",
       "compat": {
@@ -25,8 +25,17 @@
       },
       "models": [
         {
+          "id": "comma-soft/gemma4-31b",
+          "name": "Gemma 4 — thinking",
+          "reasoning": true,
+          "input": ["text", "image"],
+          "contextWindow": 200000,
+          "maxTokens": 32768,
+          "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 }
+        },
+        {
           "id": "comma-soft/gemma4-31b-instant",
-          "name": "Main model — instant (no reasoning)",
+          "name": "Gemma 4 — instant (no reasoning)",
           "reasoning": false,
           "input": ["text", "image"],
           "contextWindow": 200000,
@@ -34,12 +43,41 @@
           "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 }
         },
         {
-          "id": "comma-soft/gemma4-31b",
-          "name": "Main model — thinking",
-          "reasoning": true,
-          "input": ["text", "image"],
+          "id": "comma-soft/comma-llm-agentic-nonreasoning",
+          "name": "GLM agentic — instant (no reasoning)",
+          "reasoning": false,
+          "input": ["text"],
           "contextWindow": 200000,
           "maxTokens": 32768,
+          "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 }
+        },
+        {
+          "id": "comma-soft/comma-llm-agentic",
+          "name": "GLM agentic — thinking",
+          "reasoning": true,
+          "input": ["text"],
+          "contextWindow": 200000,
+          "maxTokens": 32768,
+          "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 }
+        },
+        {
+          "id": "openai/gpt-5.2",
+          "name": "GPT-5.2",
+          "reasoning": true,
+          "input": ["text", "image"],
+          "contextWindow": 400000,
+          "maxTokens": 32768,
+          "compat": { "maxTokensField": "max_completion_tokens" },
+          "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 }
+        },
+        {
+          "id": "openai/gpt-5.4",
+          "name": "GPT-5.4",
+          "reasoning": true,
+          "input": ["text", "image"],
+          "contextWindow": 400000,
+          "maxTokens": 32768,
+          "compat": { "maxTokensField": "max_completion_tokens" },
           "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 }
         }
       ]

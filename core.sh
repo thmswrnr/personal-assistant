@@ -25,9 +25,12 @@ MODELS=""
 MODELS_ARG=()
 [ -n "$MODELS" ] && MODELS_ARG=(--models "$MODELS")
 CONTAINER="core_harness"
-# Context-saver extension: spills large JSON tool output to a file (the model queries it
-# with jq) to keep context lean. Auto-discovery doesn't load .mjs, so pass it explicitly.
-EXT="/app/.pi/extensions/context-saver.mjs"
+# Core's context extensions — one dedicated concern each (spill large JSON to file, loop guard,
+# long-term memory injection). Auto-discovery is trust-gated and skips .mjs, so load each
+# explicitly with its own -e (the arg parser accepts repeated -e). Compaction is left to pi's
+# native mechanism (it tracks file-ops in the summary, which a custom hook would discard).
+EXT_DIR="/app/.pi/extensions"
+EXT_ARGS=(-e "$EXT_DIR/spill.mjs" -e "$EXT_DIR/loop-guard.mjs" -e "$EXT_DIR/memory.mjs")
 
 # Allocate a TTY only when we actually have one (so piped/non-interactive use still works).
 if [ -t 0 ] && [ -t 1 ]; then TTY=(-it); else TTY=(-i); fi
@@ -45,27 +48,27 @@ case "${1:-}" in
     shift
     [ $# -ge 1 ] || { echo "usage: ./core.sh skill <name> [args]" >&2; exit 1; }
     name="$1"; shift
-    exec docker exec "${TTY[@]}" "$CONTAINER" pi -e "$EXT" --no-session -p "/skill:${name}${*:+ $*}"
+    exec docker exec "${TTY[@]}" "$CONTAINER" pi "${EXT_ARGS[@]}" --no-session -p "/skill:${name}${*:+ $*}"
     ;;
   -p|--print)
     shift
-    exec docker exec "${TTY[@]}" "$CONTAINER" pi -e "$EXT" --no-session -p "$*"
+    exec docker exec "${TTY[@]}" "$CONTAINER" pi "${EXT_ARGS[@]}" --no-session -p "$*"
     ;;
   -c|--continue)
     # Resume the last session (optionally with an opening message) — pi's native --continue.
     shift
     if [ $# -gt 0 ]; then
-      exec docker exec "${TTY[@]}" "$CONTAINER" pi -e "$EXT" --continue "$*" "${MODELS_ARG[@]}"
+      exec docker exec "${TTY[@]}" "$CONTAINER" pi "${EXT_ARGS[@]}" --continue "$*" "${MODELS_ARG[@]}"
     else
-      exec docker exec "${TTY[@]}" "$CONTAINER" pi -e "$EXT" --continue "${MODELS_ARG[@]}"
+      exec docker exec "${TTY[@]}" "$CONTAINER" pi "${EXT_ARGS[@]}" --continue "${MODELS_ARG[@]}"
     fi
     ;;
   "")
     # New interactive session.
-    exec docker exec "${TTY[@]}" "$CONTAINER" pi -e "$EXT" "${MODELS_ARG[@]}"
+    exec docker exec "${TTY[@]}" "$CONTAINER" pi "${EXT_ARGS[@]}" "${MODELS_ARG[@]}"
     ;;
   *)
     # New interactive session, seeded with an opening prompt.
-    exec docker exec "${TTY[@]}" "$CONTAINER" pi -e "$EXT" "${MODELS_ARG[@]}" "$*"
+    exec docker exec "${TTY[@]}" "$CONTAINER" pi "${EXT_ARGS[@]}" "${MODELS_ARG[@]}" "$*"
     ;;
 esac

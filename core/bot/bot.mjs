@@ -19,7 +19,10 @@ import { writeFileSync, readFileSync, rmSync, readdirSync } from "node:fs";
 
 const TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const ALLOWED = process.env.TELEGRAM_CHAT_ID ? String(process.env.TELEGRAM_CHAT_ID) : "";
-const EXT = "/app/.pi/extensions/context-saver.mjs";
+// Core's context extensions — one dedicated concern each (spill, loop guard, memory). Loaded with
+// one -e apiece (pi's arg parser accepts repeated -e). Compaction stays native to pi.
+const EXT_DIR = "/app/.pi/extensions";
+const EXT_ARGS = ["spill", "loop-guard", "memory"].flatMap((n) => ["-e", `${EXT_DIR}/${n}.mjs`]);
 // Appended to Core's system prompt for bot runs only (the CLI stays plain markdown): the reply
 // is rendered in Telegram, which supports a small HTML subset. Keep this strict — invalid HTML
 // makes Telegram reject the message (we then fall back to plain, showing raw tags).
@@ -291,7 +294,7 @@ async function downloadTgFile(fileId, base) {
 function runAgent(prompt, imagePath, handlers = {}, sessionId) {
   return new Promise((resolve) => {
     const head = sessionId ? ["--mode", "json", "--session-id", sessionId] : ["--mode", "json"];
-    const tail = [...(activeModel ? ["--model", activeModel] : []), "-e", EXT, "--append-system-prompt", TG_FORMAT];
+    const tail = [...(activeModel ? ["--model", activeModel] : []), ...EXT_ARGS, "--append-system-prompt", TG_FORMAT];
     const args = imagePath ? [...head, `@${imagePath}`, prompt, ...tail] : [...head, prompt, ...tail];
     const p = spawn("pi", args, { cwd: "/app", detached: true, stdio: ["ignore", "pipe", "pipe"] });
     let err = "", buf = "", done = false;

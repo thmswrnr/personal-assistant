@@ -107,14 +107,16 @@ services"; **Telegram** — see "Telegram bridge"; **self-hosted model** —
 ```
 Inside an interactive chat, `/new` starts a fresh session and `/resume` picks a past one
 (pi built-ins). One-shot modes (`-p`, `skill`) are stateless — they save no session.
-It starts the stack if needed and loads the context-saver extension. The model is whatever
-`data/pi/settings.json` selects (no `--model` flag needed).
+It starts the stack if needed and loads Core's context extensions (one `-e` each). The model is
+whatever `data/pi/settings.json` selects (no `--model` flag needed).
 
 ### Under the hood (equivalent raw commands)
 ```bash
 docker exec core_harness pi --list-models                                     # which models are configured?
-docker exec -it core_harness pi -e /app/.pi/extensions/context-saver.mjs       # uses settings.json default
-docker exec core_harness pi -p "/skill:process-inbox" -e /app/.pi/extensions/context-saver.mjs
+# Core loads three small extensions, one dedicated concern each, via repeated -e:
+EXTS="-e /app/.pi/extensions/spill.mjs -e /app/.pi/extensions/loop-guard.mjs -e /app/.pi/extensions/memory.mjs"
+docker exec -it core_harness pi $EXTS                                          # uses settings.json default
+docker exec core_harness pi -p "/skill:process-inbox" $EXTS
 ```
 
 Stop: `docker compose down`.
@@ -200,7 +202,7 @@ subagents**, then collects and synthesizes the results — you only ever talk to
 provided by the [`@tintinweb/pi-subagents`](https://www.npmjs.com/package/@tintinweb/pi-subagents)
 pi extension (a Claude Code-style `Agent` tool), installed by `setup.sh` (pinned).
 
-Unlike the bundled `extensions/` (loaded explicitly with `-e`, e.g. context-saver), this is an
+Unlike the bundled `extensions/` (loaded explicitly with `-e`, e.g. spill/memory), this is an
 installed **pi package**: `setup.sh` runs `pi install` once, which registers it in
 `data/pi/settings.json` so pi **auto-loads it on every run** — CLI, the Telegram bridge, and
 scheduled jobs alike. No launcher flags needed. To (re)install by hand:
@@ -223,10 +225,10 @@ Core runs are **stateless** — every command, scheduled job, and Telegram messa
 process. Long-term memory is how durable facts survive that: they're recorded as small files
 under `data/storage/memory/` (one fact per file), with an auto-generated `MEMORY.md` **index**.
 
-- The `memory.mjs` extension (registered from `context-saver.mjs`, so it loads on every entry
-  point) injects the index into the system prompt on **every** run — zero tool calls, always
-  present. Full fact files are read on demand only when relevant — the same *progressive
-  disclosure* as skills, so context stays lean.
+- The `memory.mjs` extension (loaded via its own `-e` on every entry point) injects the index
+  into the system prompt on **every** run — zero tool calls, always present. Full fact files are
+  read on demand only when relevant — the same *progressive disclosure* as skills, so context
+  stays lean.
 - The `remember` skill captures facts: `save` / `forget` / `list`, with the index regenerated on
   every change (so it can't drift). Core saves a fact when you ask ("remember that…") or when a
   clearly durable preference/fact emerges — not one-off details.
@@ -240,12 +242,15 @@ already in context — no re-asking, no stale assumptions.
 
 To keep the model's context lean over long sessions:
 
-- **Spill-to-file** (`data/pi/extensions/context-saver.mjs`, loaded by `core.sh`) — big JSON
-  tool output (search results, the subscriptions feed, …) is written to a file and replaced with
-  a compact preview + path; the model queries it with `jq`. Deterministic, free, no extra model
-  call — so it stays model-agnostic.
+- **Spill-to-file** (`data/pi/extensions/spill.mjs`) — big JSON tool output (search results, the
+  subscriptions feed, …) is written to a file and replaced with a compact preview + path; the
+  model queries it with `jq`. Deterministic, free, no extra model call.
 - **Compaction** — handled natively by pi (`settings.compaction`): when the conversation grows
-  long, older turns are summarized by your main model. No separate "utility" model to run.
+  long, older turns are summarized by the active model. pi tracks file operations in the summary
+  so post-compaction context still knows what was read/edited; a custom cheap-model hook would
+  discard that, so we leave compaction to pi.
+- **Loop guard** (`data/pi/extensions/loop-guard.mjs`) — if the model issues the same tool call
+  several times in a row with no new outcome, a corrective nudge is appended so it breaks out.
 
 ---
 
