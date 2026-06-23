@@ -51,10 +51,10 @@ elif command -v docker-compose >/dev/null 2>&1; then DC="docker-compose"
 else warn "Docker Compose not found — install it first."; exit 1; fi
 ok "docker + compose present"
 if docker info 2>/dev/null | grep -qi nvidia || command -v nvidia-smi >/dev/null 2>&1; then
-  ok "NVIDIA GPU runtime detected"
+  ok "NVIDIA GPU runtime detected (only needed if you self-host the model)"
 else
-  warn "No NVIDIA GPU runtime detected. Core is built for a ~16GB GPU; CPU-only works but is slow"
-  warn "(remove the deploy.resources blocks in docker-compose.yml for CPU)."
+  info "No NVIDIA GPU runtime — fine. Core talks to an external API; a GPU is only needed if you"
+  info "choose to self-host the model (see examples/local-models/)."
 fi
 
 # ── 2. .env ─────────────────────────────────────────────────────────────────────────
@@ -67,24 +67,16 @@ bold "3/6  SearXNG secret"
 if grep -qE '^SEARXNG_SECRET=.+' .env; then ok "SEARXNG_SECRET already set"
 else set_env SEARXNG_SECRET "$(openssl rand -hex 32)"; ok "generated SEARXNG_SECRET"; fi
 
-# ── 4. Models (the other hard dependency) ─────────────────────────────────────────────
-bold "4/6  Models (downloaded into data/models/)"
-MODELS=(
-  "unsloth/gemma-4-12b-it-GGUF gemma-4-12b-it-Q5_K_M.gguf"   # main (text+vision)
-  "unsloth/gemma-4-12b-it-GGUF mmproj-BF16.gguf"             # vision projector
-  "bartowski/Qwen2.5-3B-Instruct-GGUF Qwen2.5-3B-Instruct-Q5_K_M.gguf"  # util/distiller
-)
-missing=()
-for m in "${MODELS[@]}"; do
-  f="data/models/$(echo "$m" | awk '{print $2}')"
-  [ -f "$f" ] && ok "have $(basename "$f")" || missing+=("$m")
-done
-if [ "${#missing[@]}" -gt 0 ]; then
-  warn "${#missing[@]} model file(s) missing (~10GB total to download)."
-  if yesno "Download them now?" y; then
-    for m in "${missing[@]}"; do scripts/download-model.sh $m; done
-    ok "models downloaded"
-  else warn "Skipped — the stack won't become healthy until the model files are in data/models/."; fi
+# ── 4. Model API key (the hard dependency for talking to your LLM) ─────────────────────
+bold "4/6  Model API key (LLM_API_KEY)"
+info "Core talks to an OpenAI-compatible API. The endpoint + model live in data/pi/models.json"
+info "(the 'api' provider) and data/pi/settings.json; only the KEY goes here."
+info "Self-hosting instead? Any value works (a local server ignores it) — see step 5."
+if grep -qE '^LLM_API_KEY=.+' .env; then ok "LLM_API_KEY already set"
+else
+  k="$(askval "Your model API key" secret)"
+  if [ -n "$k" ]; then set_env LLM_API_KEY "$k"; ok "LLM_API_KEY saved"
+  else warn "no key entered — set LLM_API_KEY in .env before Core can reach a hosted model."; fi
 fi
 
 # ── 5. Optional integrations (configure only what you want) ───────────────────────────
@@ -116,15 +108,26 @@ if yesno "Google suite (Gmail / Drive / Calendar / YouTube)?"; then
   info "  2. Run on the host:  node scripts/google-oauth.mjs   (see README → Google setup)"
 fi
 
-# Comma-Soft Alan — one key serves both the `alan` skill (reads the secrets file) and the `alan`
-# pi provider (reads $ALAN_API_KEY from .env via env_file; see data/pi/models.json). Write both.
-if yesno "Comma-Soft Alan (remote models for Core/subagents + the alan skill)?"; then
+# Comma-Soft Alan *skill* — ask the Alan assistant from inside Core. Reads its key from
+# data/secrets/alan_api_key. This is separate from your model provider (LLM_API_KEY) above —
+# though if Alan IS your model provider, use that same key for LLM_API_KEY.
+if yesno "Comma-Soft Alan skill (ask the Alan assistant)?"; then
   a="$(askval "Alan API key (Bearer — Alan → user settings → API keys)" secret)"
   if [ -n "$a" ]; then
     printf '%s\n' "$a" > data/secrets/alan_api_key
-    set_env ALAN_API_KEY "$a"
-    ok "Alan key saved (data/secrets/alan_api_key + .env ALAN_API_KEY)"
-  else warn "no key — Alan left off"; fi
+    ok "Alan key saved (data/secrets/alan_api_key)"
+  else warn "no key — Alan skill left off"; fi
+fi
+
+# Self-hosting the model (optional) — download the GGUF for examples/local-models/.
+if yesno "Self-host the model locally (downloads ~8GB GGUF for examples/local-models/)?"; then
+  for m in "unsloth/gemma-4-12b-it-GGUF gemma-4-12b-it-Q5_K_M.gguf" \
+           "unsloth/gemma-4-12b-it-GGUF mmproj-BF16.gguf"; do
+    f="data/models/$(echo "$m" | awk '{print $2}')"
+    [ -f "$f" ] && ok "have $(basename "$f")" || scripts/download-model.sh $m
+  done
+  info "Start it:  cd examples/local-models && docker compose up -d"
+  info "Then point the 'api' provider baseUrl in data/pi/models.json at it (see its README)."
 fi
 
 # ── 6. Build & start ──────────────────────────────────────────────────────────────────
@@ -153,7 +156,7 @@ SUBAGENTS_PKG="npm:@tintinweb/pi-subagents@0.10.3"
 PROFILE=(); [ "$USE_TELEGRAM" = yes ] && PROFILE=(--profile telegram)
 if yesno "Build the image and start the stack now?" y; then
   $DC "${PROFILE[@]}" up -d --build
-  ok "stack starting (first run loads the models — gated by a healthcheck, ~30–60s)"
+  ok "stack starting (core + searxng)"
   if docker exec core_harness pi install "$SUBAGENTS_PKG" >/dev/null 2>&1; then
     ok "subagent extension installed ($SUBAGENTS_PKG)"
   else

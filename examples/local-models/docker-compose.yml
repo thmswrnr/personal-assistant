@@ -1,0 +1,67 @@
+# OPTIONAL local model server for Core — a standalone llama.cpp stack you can run if you'd
+# rather self-host the model instead of using a hosted API. It is INDEPENDENT of Core's main
+# docker-compose.yml: run it here (same machine or another), then point Core's generic provider
+# at it. Core does not depend on this; if you use a hosted API you never touch this file.
+#
+# This is the seed for a dedicated model-serving repo — copy this directory out and keep your
+# GGUF files alongside it.
+#
+# Wire Core to it:
+#   1. Put a GGUF in ./models (or adjust the volume below). The default reuses Core's
+#      ../../data/models so it works in-place from this repo.
+#   2. In data/pi/models.json set the `api` provider baseUrl to this server, e.g.
+#        "baseUrl": "http://<this-host-ip>:8080/v1"      (another machine)
+#        "baseUrl": "http://host.docker.internal:8080/v1" (same machine, from Core's container)
+#      and set the model id to "local-model" (the alias below).
+#   3. In data/pi/settings.json set "defaultModel": "local-model".
+#   4. LLM_API_KEY can be any value — a local server ignores it.
+#
+# GPU is assumed (NVIDIA). For CPU-only, drop the `deploy.resources` block and expect it to be
+# slow. Note: Core no longer uses a separate "utility" model — this stack serves just the one
+# main model.
+services:
+  llm:
+    # Pinned by digest (the working :server-cuda image) for reproducible rebuilds.
+    image: ghcr.io/ggml-org/llama.cpp@sha256:841b199aed2649a748875b043b32fed2e8c2d4d87e1d563556817fb7fa44b72b
+    container_name: local_llm
+    ports:
+      - "8080:8080"
+    volumes:
+      # Reuses Core's model dir by default; in a standalone repo point this at ./models.
+      - ../../data/models:/models:ro
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 180s
+    environment:
+      - LLAMA_ARG_HOST=0.0.0.0
+      - LLAMA_ARG_MODEL=/models/gemma-4-12b-it-Q5_K_M.gguf
+      # Multimodal projector (Gemma 4 is encoder-free; the vision/audio tower ships
+      # separately). With this set, the OpenAI API accepts image_url + input_audio parts —
+      # which also lets this same server back the bot's optional VOICE_* transcription.
+      - LLAMA_ARG_MMPROJ=/models/mmproj-BF16.gguf
+      # Fixed alias so /v1/models reports a stable id that models.json can target.
+      - LLAMA_ARG_ALIAS=local-model
+      # Enable Jinja chat-template + tool-call parsing (required for OpenAI tool calling).
+      - LLAMA_ARG_JINJA=1
+      # A few parallel slots + a unified KV cache so concurrent Core clients share one pool.
+      - LLAMA_ARG_N_PARALLEL=3
+      - LLAMA_ARG_KV_UNIFIED=1
+      - LLAMA_ARG_CTX_SIZE=49152
+      - LLAMA_ARG_N_GPU_LAYERS=-1
+      - LLAMA_ARG_FLASH_ATTN=on
+      - LLAMA_ARG_CACHE_TYPE_K=q8_0
+      - LLAMA_ARG_CACHE_TYPE_V=q8_0
+      - LLAMA_ARG_UBATCH=2048
+      - LLAMA_ARG_THINK_BUDGET=512
+    # pi sends no sampling params, so the server CLI defaults ARE the sampling. Tuned for Gemma.
+    command: ["--temp", "0.7", "--top-k", "64", "--top-p", "0.95", "--min-p", "0.0"]
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]

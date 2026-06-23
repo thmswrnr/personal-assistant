@@ -20,8 +20,8 @@ const API = "https://gmail.googleapis.com/gmail/v1/users/me";
 const STATE_DIR = process.env.GMAIL_STATE_DIR ?? "/app/storage/state";
 const WATCH_FILE = `${STATE_DIR}/gmail-watch.json`;
 const PENDING_FILE = `${STATE_DIR}/gmail-pending.json`;
-// This account doesn't use Gmail's category tabs, so `category:primary` matches nothing.
-// Plain unread-inbox is the right "new mail" signal here.
+// Unread mail in the inbox (newest first, capped at 25 in the query below). No category filter:
+// this account doesn't use Gmail's tabs, so `category:primary` would match nothing.
 const WATCH_QUERY = "is:unread in:inbox";
 
 function die(msg) {
@@ -206,14 +206,15 @@ async function cmdRead(token, id) {
   };
 }
 
-// Non-interactive poller for the scheduler's `watch` gate (NOT for chat use). Read-only
-// against Gmail, cursor-based, edge-triggered. The scheduler runs this as a plain shell
-// command and cares only about the exit code:
-//   exit 0  → new unread-Primary mail appeared; the new messages are staged to
-//             PENDING_FILE and the scheduler fires the Core run that summarizes them.
-//   exit 1  → nothing new (or first-run priming, or an error) → no Core run.
-// Cursor = the set of unread-Primary ids already announced. Read messages drop out of the
-// query on their own, so the set stays bounded and self-pruning.
+// Non-interactive poller for the scheduler, run every few minutes as a plain shell command.
+// Cursor-based + edge-triggered: it announces only mail it hasn't announced before. When new
+// unread mail appears it sends the Telegram notification ITSELF (deterministic — see
+// notifyNewMail), so delivery never depends on a model executing tools, then exits 1 so the
+// scheduler does NOT also fire its (now-unused) LLM prompt. Exit code contract:
+//   exit 1  → always (nothing new, first-run priming, or "new mail found AND notified").
+//   exit 0  → never used now; the watch is self-contained.
+// Cursor = the set of unread ids already announced; read mail drops out of the query on its
+// own, so the set stays bounded and self-pruning. The query is capped at 25 (newest first).
 async function cmdWatch(token) {
   mkdirSync(STATE_DIR, { recursive: true });
 
@@ -256,7 +257,35 @@ async function cmdWatch(token) {
     }),
   );
   writeFileSync(PENDING_FILE, JSON.stringify(messages, null, 2));
-  process.exit(0);
+
+  // Notify directly and stop. exit 1 so the scheduler doesn't also run an LLM prompt.
+  await notifyNewMail(messages);
+  process.exit(1);
+}
+
+// Push a Telegram notification about new unread mail — self-contained (same sendMessage as the
+// notify skill) so the watcher never relies on the model executing tools. One consolidated
+// message: sender + subject per item, newest first. HTML with a plain-text retry, length-capped.
+async function notifyNewMail(messages) {
+  const TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+  const CHAT = process.env.TELEGRAM_CHAT_ID;
+  if (!TOKEN || !CHAT) return; // Telegram not configured — nothing to send.
+
+  const esc = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const senderName = (from) => (from.match(/^\s*"?([^"<]+?)"?\s*</)?.[1] || from).trim();
+  const lines = messages.map((m) => `• <b>${esc(m.subject || "(no subject)")}</b> — ${esc(senderName(m.from))}`);
+  const text = `📬 ${messages.length} new unread email${messages.length === 1 ? "" : "s"}:\n${lines.join("\n")}`;
+
+  const send = (parseMode) =>
+    fetch(`https://api.telegram.org/bot${TOKEN}/sendMessage`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ chat_id: CHAT, text: text.slice(0, 4000), ...(parseMode ? { parse_mode: parseMode } : {}) }),
+    }).then((r) => r.ok).catch(() => false);
+
+  const ok = (await send("HTML")) || (await send(null));
+  // Log to stderr (the scheduler ignores it for the gate) so delivery is visible in docker logs.
+  console.error(`gmail watch: ${messages.length} new — notification ${ok ? "sent" : "FAILED"}`);
 }
 
 const [cmd, ...rest] = process.argv.slice(2);

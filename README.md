@@ -1,95 +1,97 @@
-# Core — a local, private personal assistant
+# Core — a self-hosted, model-agnostic personal assistant
 
-Core is a self-hosted assistant: a local, multimodal LLM (via
-[llama.cpp](https://github.com/ggml-org/llama.cpp)) driven by the
-[**pi**](https://github.com/earendil-works/pi) agent harness, in Docker, sharing a set of
-folders on your machine. It reads and organizes your documents, keeps a "second brain,"
-reaches services you connect (Gmail, Drive, Calendar, YouTube, the web), runs recurring
-jobs on a schedule, and can reach you on Telegram — all running on your own box.
+Core is a self-hosted assistant: the [**pi**](https://github.com/earendil-works/pi) agent
+harness in Docker, driving **any OpenAI-compatible LLM**, sharing a set of folders on your
+machine. It reads and organizes your documents, keeps a "second brain," reaches services you
+connect (Gmail, Drive, Calendar, YouTube, the web), runs recurring jobs on a schedule, and can
+reach you on Telegram — all running on your own box. The harness is tiny, so it's happy on a
+Raspberry Pi talking to a hosted API; if you'd rather self-host the model, point it at a local
+server instead (see [`examples/local-models/`](examples/local-models/)).
 
-> **Status:** working end-to-end. The active model is **Gemma 4 12B** (text + vision) with a
-> small **Qwen2.5 3B** "utility" model for context work. `docker compose up -d` starts the
-> stack; you drive Core through the `./core.sh` launcher (and optionally a Telegram bot). It
-> has real tool-calling + thinking, ~15 skills, a built-in scheduler, and automatic
-> context management. CPU/GPU: built for a single ~16 GB NVIDIA GPU.
+> **Status:** working end-to-end. **Model-agnostic** — set an endpoint + key + model id (three
+> values) and Core runs against any OpenAI-compatible API (hosted or self-hosted). `docker
+> compose up -d` starts the stack; you drive Core through the `./core.sh` launcher (and
+> optionally a Telegram bot). It has real tool-calling + thinking, ~15 skills, a built-in
+> scheduler, and automatic context management. No GPU needed when you use a hosted API.
 
 ---
 
 ## Architecture
 
 ```
-                         ┌───────────────────────────┐  http://llm:8080/v1   ┌─────────────────────────┐
-                         │ core  (pi harness + sched) │ ───────────────────▶ │ llm  (llama.cpp, GPU)   │
-   ./core.sh ──exec────▶ │ Node 22 · read/write/edit/ │                       │ Gemma 4 12B + vision    │
-   (Telegram bot ─────▶) │ bash · skills · scheduler  │ ──┐                   └─────────────────────────┘
-                         └─────────────┬──────────────┘   │ http://llm-util:8080  ┌─────────────────────────┐
-                                       │ volumes           └─────────────────────▶ │ llm-util (llama.cpp,GPU)│
-              ┌────────────────────────┼──────────────┐                            │ Qwen2.5 3B (distill/    │
-           data/pi   data/storage  data/secrets   skills/                          │ compaction)             │
-           (config)   (your files)   (tokens)    (capabilities)                    └─────────────────────────┘
+                         ┌───────────────────────────┐   OpenAI-compatible    ┌─────────────────────────┐
+                         │ core  (pi harness + sched) │ ─────HTTPS (key)─────▶ │  Your LLM API           │
+   ./core.sh ──exec────▶ │ Node 22 · read/write/edit/ │                        │  (hosted, or a local    │
+   (Telegram bot ─────▶) │ bash · skills · scheduler  │                        │   server you run)       │
+                         └─────────────┬──────────────┘                        └─────────────────────────┘
+                                       │ volumes
+              ┌────────────────────────┼──────────────┐
+           data/pi   data/storage  data/secrets   skills/
+           (config)   (your files)   (tokens)    (capabilities)
                                        │ http://searxng:8080  ┌──────────────────────┐
                                        └────────────────────▶ │ searxng (metasearch) │
                                                               └──────────────────────┘
 ```
 
-- **`llm`** — llama.cpp CUDA server; loads the GGUF in `data/models/` + the vision projector,
-  serves an OpenAI-compatible API. 3 slots over a **unified KV pool** (49 K total context shared
-  dynamically) so the interactive session, bot, and scheduler don't starve each other.
-- **`llm-util`** — a small, fast model used only by the context-saver extension to distill big
-  tool output and summarize on compaction (keeps the main model's context lean).
+- **`core`** — the pi harness. Talks to your model over an OpenAI-compatible API (endpoint +
+  model in `data/pi/`, key in `.env`). Runs the **scheduler** as its main process and executes
+  skills. Interactive/one-shot use attaches via `docker exec` (the `./core.sh` launcher).
 - **`searxng`** — self-hosted, private metasearch (the `websearch` skill); no API key.
-- **`core`** — the pi harness. Runs the **scheduler** as its main process and executes skills.
-  Interactive/one-shot use attaches via `docker exec` (the `./core.sh` launcher).
 - **`bot`** — *optional* Telegram bridge (off unless you enable its profile).
+
+The model itself is **not** part of this stack — it's whatever OpenAI-compatible endpoint you
+configure. To self-host one, [`examples/local-models/`](examples/local-models/) is a standalone
+llama.cpp server you can run alongside Core or on another machine.
 
 ---
 
 ## Prerequisites
 
 - Docker + Docker Compose
-- **NVIDIA GPU** (~16 GB VRAM for the default models) + drivers + the
-  [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html).
-  CPU-only is possible (remove the `deploy.resources` blocks) but slow.
-- The GGUF model files in `data/models/` (see Setup) — not committed (too large).
+- An **OpenAI-compatible LLM endpoint** + API key. Any will do — a hosted provider, or a model
+  you self-host (see [`examples/local-models/`](examples/local-models/)). For solid tool-calling
+  + thinking, use a capable instruct model.
+- No GPU required for Core itself (only if you choose to self-host the model).
 
 ---
 
 ## Setup
 
-**Quick path:** run `./setup.sh` — it checks prerequisites, creates `.env`, generates the
-SearXNG secret, downloads the models, walks you through the optional integrations you want
-(Telegram / Sonos / GitHub / Google), and builds & starts the stack. It's idempotent — re-run it
-anytime to add an integration; it won't overwrite anything you've set. The manual steps below are
-the same thing by hand.
+### 1. Point Core at your model — three values
+This is the whole model setup. Core talks to one **generic OpenAI-compatible provider** (named
+`api` in `data/pi/models.json`):
 
-### 1. Get the models
-Three files go in `data/models/` (the helper script resumes interrupted downloads):
+1. **Endpoint** — `data/pi/models.json` → the `api` provider's `baseUrl` (e.g.
+   `https://api.your-provider/v1`). Self-hosting? Run
+   [`examples/local-models/`](examples/local-models/) and point `baseUrl` at it.
+2. **Key** — `.env` → `LLM_API_KEY=…` (kept out of version control; a self-hosted server
+   ignores it).
+3. **Model id** — list it under the `api` provider's `models[]`, and set
+   `data/pi/settings.json` → `defaultModel` to it.
 
-```bash
-# main model (text + vision) + its vision projector
-scripts/download-model.sh unsloth/gemma-4-12b-it-GGUF gemma-4-12b-it-Q5_K_M.gguf
-scripts/download-model.sh unsloth/gemma-4-12b-it-GGUF mmproj-BF16.gguf
-# small utility model (distillation + fast compaction)
-scripts/download-model.sh bartowski/Qwen2.5-3B-Instruct-GGUF Qwen2.5-3B-Instruct-Q5_K_M.gguf
-```
+> Prefer one of pi's **built-in** providers (anthropic / openai / gemini / …)? You don't need
+> the `api` entry at all — set that provider's standard key in `.env`, and put
+> `"<provider>/<id>"` in `settings.json`. Confirm names with `pi --list-models`.
 
 ### 2. Environment
-Copy `.env.example` → `.env`. For local use you only need a SearXNG secret (used by the
-websearch container):
 ```bash
 cp .env.example .env
-# in .env:  SEARXNG_SECRET=$(openssl rand -hex 32)
+# in .env:  LLM_API_KEY=...                       # your model API key
+#           SEARXNG_SECRET=$(openssl rand -hex 32) # websearch container
 ```
-Cloud API keys (Gemini/OpenAI/Anthropic) and `TELEGRAM_*` are optional — see below.
+`TELEGRAM_*`, `VOICE_*`, and per-skill keys are optional — see below.
 
 ### 3. Start
 ```bash
-docker compose up -d --build       # builds core, starts llm + llm-util + searxng + core
+docker compose up -d --build       # builds + starts core + searxng (no local model service)
 ```
-The first start downloads/loads the models (gated by a healthcheck, ~30–60 s).
 
 Optional integrations: **Google** (Gmail/Drive/Calendar/YouTube) — see "Integrating external
-services"; **Telegram** — see "Telegram bridge".
+services"; **Telegram** — see "Telegram bridge"; **self-hosted model** —
+[`examples/local-models/`](examples/local-models/).
+
+> `./setup.sh` automates the common path (`.env`, SearXNG secret, optional integrations, build
+> & start) and is idempotent.
 
 ---
 
@@ -105,13 +107,14 @@ services"; **Telegram** — see "Telegram bridge".
 ```
 Inside an interactive chat, `/new` starts a fresh session and `/resume` picks a past one
 (pi built-ins). One-shot modes (`-p`, `skill`) are stateless — they save no session.
-It starts the stack if needed, waits for the model, and loads the context-saver extension.
+It starts the stack if needed and loads the context-saver extension. The model is whatever
+`data/pi/settings.json` selects (no `--model` flag needed).
 
 ### Under the hood (equivalent raw commands)
 ```bash
-curl -s http://localhost:8080/v1/models | jq                                  # is the model up?
-docker exec -it core_harness pi --model local/local-model -e /app/.pi/extensions/context-saver.mjs
-docker exec core_harness pi -p "/skill:process-inbox" --model local/local-model -e /app/.pi/extensions/context-saver.mjs
+docker exec core_harness pi --list-models                                     # which models are configured?
+docker exec -it core_harness pi -e /app/.pi/extensions/context-saver.mjs       # uses settings.json default
+docker exec core_harness pi -p "/skill:process-inbox" -e /app/.pi/extensions/context-saver.mjs
 ```
 
 Stop: `docker compose down`.
@@ -125,7 +128,7 @@ Stop: `docker compose down`.
 | `data/pi/` | `/app/.pi` | pi config: `models.json`, `SYSTEM.md`, `extensions/`, plus pi runtime (`sessions/`, …) |
 | `data/storage/` | `/app/storage` | your files: `inbox/`, `artefacts/` (the second brain), `archived/`, `projects/` (per-project `plan.md` + `todos.md`), `schedule.json`, `memory/` (long-term facts), `custom_skills/` (Core's own writable skills — see `skill-builder`). The main to-do list lives in Google Tasks, not here. |
 | `data/secrets/` | `/app/secrets` | OAuth creds / tokens (git-ignored) |
-| `data/models/` | `/models` (in `llm`) | the GGUF model files |
+| `data/models/` | — | GGUF files, only if you self-host via `examples/local-models/` (unused by Core's stack) |
 | `skills/` | `/app/.pi/skills` | `SKILL.md` capability packages (version-controlled) |
 | `core/` | — | the core image (`Dockerfile`) + its runtime scripts (`scheduler/`, `bot/`) |
 | `searxng/` | `/etc/searxng` (in `searxng`) | SearXNG config |
@@ -178,11 +181,14 @@ in `skills/` (mounted to pi's config dir). Current skills:
 Add a skill by creating `skills/<name>/SKILL.md` (+ an optional CLI in `scripts/`) and `docker compose restart core`.
 
 ### Vision & voice
-Gemma 4 is multimodal — Core can *see* images and *hear* audio. Drop an image in
-`data/storage/inbox/` and run `process-inbox` (it reads receipts/screenshots/photos and files
-them), or point pi's `read` tool at an image file. Over the Telegram bridge you can also send
-photos (analysed via vision) and **voice notes** (transcribed by the model's own audio encoder —
-no separate speech-to-text service).
+If your model is multimodal, Core can *see* images: drop one in `data/storage/inbox/` and run
+`process-inbox` (it reads receipts/screenshots/photos and files them), or point pi's `read` tool
+at an image file. Over the Telegram bridge you can also send photos (analysed via vision).
+
+**Voice notes** are transcribed by an **optional, separate** audio endpoint — set `VOICE_LLM_URL`
+(+ `VOICE_MODEL`, and `VOICE_API_KEY` if needed) to any OpenAI-compatible audio-capable model. If
+unset, voice notes are politely skipped. (A self-hosted [`examples/local-models/`](examples/local-models/)
+server with the Gemma projector can back this — it handles audio too.)
 
 ---
 
@@ -204,9 +210,10 @@ docker exec core_harness pi install npm:@tintinweb/pi-subagents@0.10.3
 ```
 
 Delegation is the model's own call (guided by an instruction in `data/pi/SYSTEM.md`), so how
-readily it happens tracks the boss model's judgement. On the local 12 B, subagents also share the
-single GPU, so parallel ones queue rather than run truly concurrently — the wall-clock win comes
-when subagents run on a stronger/remote model, which the boss model is free to use.
+readily it happens tracks the boss model's judgement. Subagents are independent API calls, so
+they run genuinely in parallel — the wall-clock win is real when your endpoint can serve
+concurrent requests. By default they inherit Core's model; each agent in `data/pi/agents/` can
+pin its own (e.g. a faster/cheaper id for the lightweight `fetch`/`Explore` workers).
 
 ---
 
@@ -231,19 +238,14 @@ already in context — no re-asking, no stale assumptions.
 
 ## Context management (automatic)
 
-To keep the model's context lean over long sessions, a pi extension
-(`data/pi/extensions/context-saver.mjs`, loaded by `core.sh`) transforms large tool output
-before it reaches the model:
+To keep the model's context lean over long sessions:
 
-- **Spill-to-file** — big *list-like* JSON (search results, the subscriptions feed, …) is
-  written to a file and replaced with a compact preview + path; the model queries it with `jq`.
-  Deterministic, free.
-- **Distill** — big *prose* (web pages, transcripts, long email bodies) is condensed by the
-  small `llm-util` model to just what's relevant, keeping the full text on disk as a fallback.
-- **Fast compaction** — when pi compacts the conversation, the summary is produced by the fast
-  `llm-util` model instead of the 12 B.
-
-Both `llm-util`-based features degrade gracefully if that service is down.
+- **Spill-to-file** (`data/pi/extensions/context-saver.mjs`, loaded by `core.sh`) — big JSON
+  tool output (search results, the subscriptions feed, …) is written to a file and replaced with
+  a compact preview + path; the model queries it with `jq`. Deterministic, free, no extra model
+  call — so it stays model-agnostic.
+- **Compaction** — handled natively by pi (`settings.compaction`): when the conversation grows
+  long, older turns are summarized by your main model. No separate "utility" model to run.
 
 ---
 
@@ -287,8 +289,9 @@ run fine without it.
 3. Message your bot once, then `docker logs core_bot` — it prints your chat id. Put it in `.env`
    as `TELEGRAM_CHAT_ID` and run the start command again.
 
-Texts, **voice notes** (transcribed locally), and **photos** (read via vision) all run through
-Core and get a reply; the bot acks instantly, streams the answer in as it's written, and shows
+Texts, **voice notes** (transcribed via the optional `VOICE_*` endpoint), and **photos** (read
+via vision) all run through Core and get a reply; the bot acks instantly, streams the answer in
+as it's written, and shows
 which tool/skill is running. The `notify` skill (and scheduled tasks) can message you too. The
 bridge is **locked to your chat id** — it ignores everyone else.
 
@@ -353,43 +356,36 @@ which scopes were granted** — re-run it whenever you add a skill that needs a 
 
 ## Adding or switching a model
 
-### A local GGUF (the default path)
+Core is model-agnostic. Switching models is config-only — no code changes.
+
+### The generic `api` provider (default path)
+Edit three things, all in `data/pi/`:
+
+1. **`models.json`** → the `api` provider's `baseUrl` (your OpenAI-compatible endpoint) and its
+   `models[]` (each `id` is what the API expects; `reasoning: true` for thinking models,
+   `input: ["text","image"]` only for multimodal).
+2. **`.env`** → `LLM_API_KEY=…` (a self-hosted server ignores it; any value is fine).
+3. **`settings.json`** → `defaultModel` = the id you want as the default.
+
+Apply: `docker compose restart core` (and `bot`, if running). Verify:
 ```bash
-scripts/download-model.sh <hf_repo> <filename>     # into data/models/
-```
-Then **register** it (downloading alone isn't enough):
-
-1. **`docker-compose.yml`** (`llm`): `LLAMA_ARG_MODEL=/models/<filename>`
-   (`LLAMA_ARG_ALIAS=local-model` keeps the served id stable). For a multimodal model add
-   `LLAMA_ARG_MMPROJ=/models/<projector>.gguf`.
-2. **`data/pi/models.json`**: update the entry — `id` matches `LLAMA_ARG_ALIAS`; `reasoning: true`
-   for thinking models; `input: ["text","image"]` only for multimodal; `contextWindow` ≤
-   `LLAMA_ARG_CTX_SIZE`.
-3. Apply: `docker compose up -d llm && docker compose restart core`.
-
-> **Tool calling needs `LLAMA_ARG_JINJA=1`** (already set) plus a model whose chat template
-> supports tools (Gemma 3/4, Qwen3, Llama 3.1+, Mistral-Nemo, …). Models without it *narrate*
-> tool calls as text instead of executing them.
-
-### A commercial model (e.g. Gemini)
-pi is natively multi-provider: add the API key to `.env`, add a provider/model entry, and
-select it (e.g. `pi --provider google --model gemini-2.x-...`). No code change.
-
-### Remote Alan models (the `alan` provider)
-A second provider is pre-wired in `data/pi/models.json`: **`alan`**, Comma-Soft Alan's
-OpenAI-compatible endpoint (the same backend the `alan` skill uses, exposed as model APIs). It
-gives Core and its [subagents](#subagents-parallel-delegation) stronger remote models — so
-parallel subagents run truly concurrently instead of queuing on the single local GPU. Set
-`ALAN_API_KEY` in `.env` (setup.sh prompts for it; the key never goes in `models.json`, only the
-`$ALAN_API_KEY` reference does), then:
-
-```bash
-docker exec core_harness pi --list-models | grep alan
-docker exec core_harness pi --provider alan --model comma-soft/gemma4-31b-instant -p "hi"
+docker exec core_harness pi --list-models
+docker exec core_harness pi -p "hi"
 ```
 
-Available ids: `comma-soft/gemma4-31b-instant` (fast), `comma-soft/gemma4-31b` (thinking), and
-`openai/gpt-5.4` (frontier — currently returns a 500 upstream).
+> **Tool calling** needs a model whose chat template supports tools (Gemma 3/4, Qwen3,
+> Llama 3.1+, Mistral-Nemo, most hosted instruct models, …). Models without it *narrate* tool
+> calls as text instead of executing them.
+
+### A pi built-in provider (e.g. OpenAI, Anthropic, Gemini)
+pi ships a provider catalog, so you can skip the `api` entry entirely: set that provider's
+standard key in `.env` (e.g. `OPENAI_API_KEY`) and put `"<provider>/<id>"` in `settings.json`
+`defaultModel`. Check exact names with `docker exec core_harness pi --list-models`.
+
+### Self-hosting the model
+Run [`examples/local-models/`](examples/local-models/) (a standalone llama.cpp server — same
+machine or another), then set the `api` provider's `baseUrl` to it and `defaultModel` to its
+alias. Same three knobs; the only difference is the endpoint is yours.
 
 ---
 
@@ -399,15 +395,14 @@ Available ids: `comma-soft/gemma4-31b-instant` (fast), `comma-soft/gemma4-31b` (
   loads into context (see "Skills").
 - **`EACCES` writing under `/app/.pi`** — leftover root-owned files from an earlier run:
   `docker exec -u 0 core_harness chown -R node:node /app/.pi`.
-- **pi can't reach the model** — `models.json` `baseUrl` must be `http://llm:8080/v1` (the compose
-  service name, not `localhost`); check `/v1/models` responds.
-- **Model id mismatch** — the `id` in `models.json` must match what `/v1/models` reports (kept
-  stable by `LLAMA_ARG_ALIAS=local-model`).
-- **A scheduled job runs very slowly** — the local 12 B occasionally goes into a long generation;
-  heavy multi-step prompts (e.g. a full briefing) take a few minutes. Keep scheduled prompts
-  focused; a per-job timeout in the scheduler is an easy add if it recurs.
-- **GPU not found / out of memory** — ensure the NVIDIA Container Toolkit is installed. Two
-  models share the GPU; if VRAM is tight, lower `LLAMA_ARG_CTX_SIZE` on `llm-util` (or `llm`).
-- **Agent narrates tool calls instead of running them** — the model lacks usable tool-calling or
-  `LLAMA_ARG_JINJA=1` is off. Use a function-calling model with jinja on.
+- **pi can't reach the model** — check the `api` provider's `baseUrl` in `models.json` and that
+  `LLM_API_KEY` is set. Test directly: `docker exec core_harness pi --list-models` then
+  `pi -p "hi"`. For a self-hosted endpoint, remember Core runs in a container — use
+  `host.docker.internal` (same host) or the LAN IP, not `localhost`.
+- **Model id mismatch** — the `id` in `models.json` / `defaultModel` must match what the API
+  actually serves (for `examples/local-models/`, that's the `LLAMA_ARG_ALIAS`).
+- **Auth errors (401/403)** — wrong or missing `LLM_API_KEY`, or a built-in provider whose key
+  env var has a different name (check `pi --list-models`).
+- **Agent narrates tool calls instead of running them** — the model lacks usable tool-calling.
+  Use a function-calling-capable instruct model.
 - **websearch errors** — the `searxng` container must be up and `SEARXNG_SECRET` set in `.env`.

@@ -38,6 +38,6 @@ data/pi/*
 data/pi/extensions/*
 !data/pi/extensions/context-saver.mjs
 !data/pi/extensions/memory.mjs
-# Track our custom subagent definitions (model routing: Alan + local-fallback)
+# Track our custom subagent definitions (they inherit Core's model unless they pin one)
 !data/pi/agents/
 !data/pi/agents/*.md

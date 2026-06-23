@@ -10,19 +10,20 @@
 #   ./core.sh skill process-inbox
 # In an interactive chat, /new starts a fresh session.
 #
-# It makes sure the stack is running first. Thanks to the health gate, startup returns
-# only once the model is actually loaded and serving (first run can take ~30s).
+# It makes sure the stack is running first. The model is an external API (configured in
+# data/pi/settings.json + data/pi/models.json), so there's no local model to wait for.
 set -euo pipefail
 cd "$(dirname "$0")"
 
-MODEL="local/local-model"
-# Models offered for in-session Ctrl+P switching (local ↔ remote Alan). The boss starts on
-# $MODEL; switching it mid-session also moves inherit-type subagents. Alan needs ALAN_API_KEY
-# in .env (see README → "Remote Alan models"). Harmless if Alan isn't configured — it just
-# won't authenticate when selected.
-# NOTE: --models matches BARE model ids (not provider/id), so list the ids, not "alan/*":
-# local-model + the Alan provider's comma-soft/* (gemma4-31b{,-instant}) and openai/* (gpt-5.4).
-MODELS="local-model,comma-soft/*,openai/*"
+# Core uses pi's own default model (data/pi/settings.json: defaultProvider/defaultModel), so we
+# pass no --model here — changing the default there is all it takes to switch models.
+#
+# MODELS (optional): comma-separated patterns offered for in-session Ctrl+P cycling — BARE
+# model ids/globs (e.g. "comma-soft/*"). Leave empty to skip. Switching mid-session also moves
+# inherit-type subagents.
+MODELS=""
+MODELS_ARG=()
+[ -n "$MODELS" ] && MODELS_ARG=(--models "$MODELS")
 CONTAINER="core_harness"
 # Context-saver extension: spills large JSON tool output to a file (the model queries it
 # with jq) to keep context lean. Auto-discovery doesn't load .mjs, so pass it explicitly.
@@ -44,27 +45,27 @@ case "${1:-}" in
     shift
     [ $# -ge 1 ] || { echo "usage: ./core.sh skill <name> [args]" >&2; exit 1; }
     name="$1"; shift
-    exec docker exec "${TTY[@]}" "$CONTAINER" pi -e "$EXT" --no-session -p "/skill:${name}${*:+ $*}" --model "$MODEL"
+    exec docker exec "${TTY[@]}" "$CONTAINER" pi -e "$EXT" --no-session -p "/skill:${name}${*:+ $*}"
     ;;
   -p|--print)
     shift
-    exec docker exec "${TTY[@]}" "$CONTAINER" pi -e "$EXT" --no-session -p "$*" --model "$MODEL"
+    exec docker exec "${TTY[@]}" "$CONTAINER" pi -e "$EXT" --no-session -p "$*"
     ;;
   -c|--continue)
     # Resume the last session (optionally with an opening message) — pi's native --continue.
     shift
     if [ $# -gt 0 ]; then
-      exec docker exec "${TTY[@]}" "$CONTAINER" pi -e "$EXT" --continue "$*" --model "$MODEL" --models "$MODELS"
+      exec docker exec "${TTY[@]}" "$CONTAINER" pi -e "$EXT" --continue "$*" "${MODELS_ARG[@]}"
     else
-      exec docker exec "${TTY[@]}" "$CONTAINER" pi -e "$EXT" --continue --model "$MODEL" --models "$MODELS"
+      exec docker exec "${TTY[@]}" "$CONTAINER" pi -e "$EXT" --continue "${MODELS_ARG[@]}"
     fi
     ;;
   "")
     # New interactive session.
-    exec docker exec "${TTY[@]}" "$CONTAINER" pi -e "$EXT" --model "$MODEL" --models "$MODELS"
+    exec docker exec "${TTY[@]}" "$CONTAINER" pi -e "$EXT" "${MODELS_ARG[@]}"
     ;;
   *)
     # New interactive session, seeded with an opening prompt.
-    exec docker exec "${TTY[@]}" "$CONTAINER" pi -e "$EXT" --model "$MODEL" --models "$MODELS" "$*"
+    exec docker exec "${TTY[@]}" "$CONTAINER" pi -e "$EXT" "${MODELS_ARG[@]}" "$*"
     ;;
 esac

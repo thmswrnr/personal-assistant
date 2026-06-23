@@ -1,38 +1,24 @@
 {
-  // Custom provider: the local llama.cpp server (compose service "llm").
-  // pi reaches it over the OpenAI-compatible API. "id" must match LLAMA_ARG_ALIAS.
+  // ── Your model provider ───────────────────────────────────────────────────────────────────
+  // Core is model-agnostic. To point it at ANY OpenAI-compatible API, edit just three things:
+  //   1. baseUrl below            — your endpoint (this file)
+  //   2. LLM_API_KEY in .env      — your key (env, so it stays out of version control)
+  //   3. defaultModel in settings.json + the model id(s) listed here
+  //
+  // "openai-completions" is the OpenAI chat-completions wire format — spoken by Alan, OpenAI,
+  // Groq, OpenRouter, Together, vLLM, LM Studio, llama.cpp, and most others. apiKey supports
+  // $ENV interpolation ($LLM_API_KEY here); baseUrl is a literal string. If you self-host a
+  // model (e.g. examples/local-models/), set baseUrl to its host:port and any LLM_API_KEY value
+  // (a local server ignores it). For pi's BUILT-IN providers (anthropic/openai/gemini, etc.)
+  // you don't need an entry here at all — set their standard key env var and reference the model
+  // as "<provider>/<id>" in settings.json.
+  //
+  // Shipped default: Comma-Soft Alan's OpenAI-compatible endpoint. Change it to your own.
   "providers": {
-    "local": {
-      "baseUrl": "http://llm:8080/v1",
-      "api": "openai-completions",
-      "apiKey": "not-needed",
-      "compat": {
-        "supportsDeveloperRole": false,
-        "supportsReasoningEffort": false
-      },
-      "models": [
-        {
-          "id": "local-model",
-          "name": "Gemma 4 12B (local)",
-          "reasoning": true,
-          "input": ["text", "image"],
-          "contextWindow": 49152,
-          "maxTokens": 4096,
-          "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 }
-        }
-      ]
-    },
-
-    // Remote provider: Comma-Soft Alan's OpenAI-compatible endpoint (the same backend the
-    // `alan` skill talks to, different surface). Gives Core/subagents stronger remote models so
-    // parallel subagents actually run concurrently instead of queuing on the single local GPU.
-    // The key is read from $ALAN_API_KEY (loaded into the container from .env via env_file) —
-    // never inline it here; this file is version-controlled. baseUrl omits /chat/completions
-    // (pi appends it). gpt-5.4 is listed but the upstream endpoint currently 500s for it.
-    "alan": {
+    "api": {
       "baseUrl": "https://dev.alan.de/api/v1/oai",
       "api": "openai-completions",
-      "apiKey": "$ALAN_API_KEY",
+      "apiKey": "$LLM_API_KEY",
       "compat": {
         "supportsDeveloperRole": false,
         "supportsReasoningEffort": false
@@ -40,7 +26,7 @@
       "models": [
         {
           "id": "comma-soft/gemma4-31b-instant",
-          "name": "Alan Gemma 4 31B Instant (remote)",
+          "name": "Main model — instant (no reasoning)",
           "reasoning": false,
           "input": ["text", "image"],
           "contextWindow": 200000,
@@ -49,20 +35,11 @@
         },
         {
           "id": "comma-soft/gemma4-31b",
-          "name": "Alan Gemma 4 31B Thinking (remote)",
+          "name": "Main model — thinking",
           "reasoning": true,
           "input": ["text", "image"],
           "contextWindow": 200000,
           "maxTokens": 4096,
-          "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 }
-        },
-        {
-          "id": "openai/gpt-5.4",
-          "name": "Alan GPT-5.4 (remote, frontier)",
-          "reasoning": true,
-          "input": ["text"],
-          "contextWindow": 200000,
-          "maxTokens": 8192,
           "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 }
         }
       ]

@@ -19,8 +19,8 @@ services:
       - .env
     environment:
       # Use the mounted .pi dir as pi's config dir (models.json, SYSTEM.md, skills/).
-      # The local LLM is configured as a provider in data/pi/models.json,
-      # which points at http://llm:8080/v1 (the compose service name).
+      # The model is an external OpenAI-compatible API configured in data/pi/models.json +
+      # data/pi/settings.json (key via LLM_API_KEY in .env) — no local model service required.
       - PI_CODING_AGENT_DIR=/app/.pi
       # Local timezone so scheduled "07:00" jobs fire at local time. Change as needed.
       - TZ=Europe/Berlin
@@ -32,10 +32,6 @@ services:
     command: ["node", "/app/scheduler/scheduler.mjs"]
     networks:
       - core_network
-    depends_on:
-      # Wait until the model is actually loaded and serving, not just the container started.
-      llm:
-        condition: service_healthy
 
   bot:
     # OPTIONAL Telegram bridge — chat with Core from your phone. Core runs fine without it.
@@ -60,110 +56,6 @@ services:
       - PI_CODING_AGENT_DIR=/app/.pi
       - TZ=Europe/Berlin
     command: ["node", "/app/bot/bot.mjs"]
-    networks:
-      - core_network
-    depends_on:
-      llm:
-        condition: service_healthy
-
-  llm:
-    # Pinned by digest (the working :server-cuda image) for reproducible rebuilds.
-    image: ghcr.io/ggml-org/llama.cpp@sha256:841b199aed2649a748875b043b32fed2e8c2d4d87e1d563556817fb7fa44b72b
-    container_name: local_llm
-    ports:
-      - "8080:8080"
-    volumes:
-      - ./data/models:/models:ro
-    # Override the image healthcheck timings: allow generous start_period for the large
-    # model to load before health checks count against it.
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 180s
-    environment:
-      - LLAMA_ARG_HOST=0.0.0.0
-      - LLAMA_ARG_MODEL=/models/gemma-4-12b-it-Q5_K_M.gguf
-      # Multimodal projector (Gemma 4 is encoder-free; the vision/audio tower ships
-      # separately). With this set, /props reports "vision":true and the OpenAI API
-      # accepts image_url content parts. ~175MB, offloaded to GPU alongside the model.
-      - LLAMA_ARG_MMPROJ=/models/mmproj-BF16.gguf
-      # Fixed alias so /v1/models reports a stable id that models.json can target
-      - LLAMA_ARG_ALIAS=local-model
-      # Enable Jinja chat-template + tool-call parsing (required for OpenAI tool calling)
-      - LLAMA_ARG_JINJA=1
-      # Core has several concurrent agent clients (interactive core.sh, the Telegram bot,
-      # the scheduler). Give it 3 slots so they don't block each other — AND a UNIFIED KV
-      # cache so the slots share ONE pool dynamically instead of each getting a fixed slice.
-      # A single conversation can then grow to use most of the 49152 when it's alone, while
-      # the short bot/scheduler conversations only borrow a little when active.
-      - LLAMA_ARG_N_PARALLEL=3
-      - LLAMA_ARG_KV_UNIFIED=1
-      # Total shared KV pool — one buffer (~same VRAM as a single 49152 slot, no per-slot split).
-      - LLAMA_ARG_CTX_SIZE=49152
-      - LLAMA_ARG_N_GPU_LAYERS=-1
-      # Performance: force Flash Attention (faster + less KV memory; prerequisite for q8_0 KV).
-      - LLAMA_ARG_FLASH_ATTN=on
-      # Quantize the KV cache to q8_0: ~halves KV VRAM with negligible quality loss (safe with
-      # flash attention on), freeing headroom and easing memory bandwidth.
-      - LLAMA_ARG_CACHE_TYPE_K=q8_0
-      - LLAMA_ARG_CACHE_TYPE_V=q8_0
-      # Bigger physical batch → faster prompt prefill on long inputs (briefings, images).
-      # (logical batch-size is already 2048 by default; this raises the physical ubatch.)
-      - LLAMA_ARG_UBATCH=2048
-      # Cap the model's thinking: bounds runaway reasoning traces while leaving room for genuine
-      # multi-step reasoning. Halved from 1024 → less pre-output latency every turn. -1=unlimited,
-      # 0=off, N=token budget.
-      - LLAMA_ARG_THINK_BUDGET=512
-    # pi sends NO sampling params, so the server's CLI defaults ARE the sampling. Tune for Gemma
-    # + an assistant workload: a slightly low temp for reliable tool-calls, Gemma's top_k/top_p,
-    # min_p off. (temp/top_p/min_p have no LLAMA_ARG_ env var, so they're passed as flags here;
-    # the entrypoint is llama-server, so these args append to the env-based config above.)
-    command: ["--temp", "0.7", "--top-k", "64", "--top-p", "0.95", "--min-p", "0.0"]
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities: [gpu]
-    networks:
-      - core_network
-
-  llm-util:
-    # Small, fast "utility" model for context work — distilling fat prose tool output and
-    # summarizing for compaction — so those calls stay quick and don't compete with the main
-    # model. Internal-only (no host port); reached by the context-saver extension at
-    # http://llm-util:8080. Same pinned llama.cpp image; no tools/vision needed.
-    image: ghcr.io/ggml-org/llama.cpp@sha256:841b199aed2649a748875b043b32fed2e8c2d4d87e1d563556817fb7fa44b72b
-    container_name: local_llm_util
-    volumes:
-      - ./data/models:/models:ro
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 90s
-    environment:
-      - LLAMA_ARG_HOST=0.0.0.0
-      - LLAMA_ARG_MODEL=/models/Qwen2.5-3B-Instruct-Q5_K_M.gguf
-      - LLAMA_ARG_ALIAS=util-model
-      # Apply the model's chat template correctly for /v1/chat/completions.
-      - LLAMA_ARG_JINJA=1
-      # Enough to hold a fat tool output (a long page/transcript) plus prompt + summary.
-      - LLAMA_ARG_CTX_SIZE=16384
-      - LLAMA_ARG_N_GPU_LAYERS=-1
-      - LLAMA_ARG_FLASH_ATTN=on
-      - LLAMA_ARG_N_PARALLEL=1
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities: [gpu]
     networks:
       - core_network
 

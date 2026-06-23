@@ -3,7 +3,7 @@
 //
 // Long-polls Telegram; each message from the AUTHORIZED chat is run through the Core agent
 // (`pi`, same model/skills/extension as core.sh) and the answer is sent back. Handles text,
-// voice notes (transcribed by the local model's audio encoder), and images/photos (Core sees
+// voice notes (transcribed via the optional VOICE_* endpoint), and images/photos (Core sees
 // them via the model's vision). Messages from any other chat are ignored (single-user lock).
 // Because the bridge can send messages, it's also the channel the `notify` skill uses.
 //
@@ -34,9 +34,13 @@ const TG_FORMAT =
   "tables). Escape literal <, >, & as &lt; &gt; &amp; in normal text. No other tags (no <h1>, " +
   "<ul>, <li>, <p>, <br>). For lists use lines starting with •. Keep replies concise.";
 const API = `https://api.telegram.org/bot${TOKEN}`;
-// The local model also handles audio (the projector includes an audio encoder), so voice
-// notes are transcribed by the main model — no separate STT service.
-const LLM_URL = process.env.LLM_URL ?? "http://llm:8080/v1/chat/completions";
+// Voice notes are transcribed by an OPTIONAL, separate OpenAI-compatible endpoint — set
+// VOICE_LLM_URL (full /chat/completions URL) + VOICE_MODEL (and VOICE_API_KEY if it needs a
+// key) to any audio-capable model. If unset, voice notes are politely skipped. This keeps
+// Core model-agnostic: the main text model doesn't have to handle audio.
+const VOICE_URL = process.env.VOICE_LLM_URL ?? "";
+const VOICE_MODEL = process.env.VOICE_MODEL ?? "";
+const VOICE_API_KEY = process.env.VOICE_API_KEY ?? "";
 
 // Tunables. Telegram caps a message at 4096 chars; we slice a little below that and only
 // break on a newline once past TG_CHUNK_MIN_BREAK, so an HTML tag or word is never cut.
@@ -74,8 +78,8 @@ function resetSession(chatId) {
 
 // ---- model selection (switchable from Telegram via /model) ----
 // The switchable list is the single source of truth in models.json (pi's config dir). The id
-// we pass to `pi --model` is "<provider>/<model.id>" (e.g. local/local-model,
-// alan/comma-soft/gemma4-31b) — the same form core.sh uses.
+// we pass to `pi --model` is "<provider>/<model.id>" (e.g. api/comma-soft/gemma4-31b) — the
+// same provider/model form pi uses everywhere.
 const MODELS_JSON = "/app/.pi/models.json";
 
 // models.json is authored with // comments and trailing-comment lines, which JSON.parse
@@ -111,13 +115,24 @@ function loadModels() {
   } catch (e) {
     log("loadModels error:", e?.message ?? e);
   }
-  return [{ id: "local/local-model", name: "Gemma 4 12B (local)" }];
+  return [];
+}
+
+// pi's own default model (data/pi/settings.json: defaultProvider + defaultModel). Used as the
+// bot's starting model so the reply path matches what pi would pick on its own.
+const SETTINGS_JSON = "/app/.pi/settings.json";
+function defaultModelId() {
+  try {
+    const s = JSON.parse(readFileSync(SETTINGS_JSON, "utf8"));
+    if (s.defaultProvider && s.defaultModel) return `${s.defaultProvider}/${s.defaultModel}`;
+  } catch { /* fall through to first configured model */ }
+  return MODELS[0]?.id ?? "";
 }
 
 const MODELS = loadModels();
-// Each bot start begins on the default model (local), just like the CLI — a /model switch
-// lasts only for the running process and resets on restart. No persistence.
-let activeModel = process.env.CORE_MODEL ?? "local/local-model";
+// Each bot start begins on pi's default model, just like the CLI — a /model switch lasts only
+// for the running process and resets on restart. No persistence.
+let activeModel = process.env.CORE_MODEL ?? defaultModelId();
 const modelName = (id) => MODELS.find((m) => m.id === id)?.name ?? id;
 function setModel(id) { activeModel = id; }
 
@@ -276,7 +291,7 @@ async function downloadTgFile(fileId, base) {
 function runAgent(prompt, imagePath, handlers = {}, sessionId) {
   return new Promise((resolve) => {
     const head = sessionId ? ["--mode", "json", "--session-id", sessionId] : ["--mode", "json"];
-    const tail = ["--model", activeModel, "-e", EXT, "--append-system-prompt", TG_FORMAT];
+    const tail = [...(activeModel ? ["--model", activeModel] : []), "-e", EXT, "--append-system-prompt", TG_FORMAT];
     const args = imagePath ? [...head, `@${imagePath}`, prompt, ...tail] : [...head, prompt, ...tail];
     const p = spawn("pi", args, { cwd: "/app", detached: true, stdio: ["ignore", "pipe", "pipe"] });
     let err = "", buf = "", done = false;
@@ -345,7 +360,8 @@ function ffmpegTo16kWav(input, output) {
   });
 }
 
-// Transcribe a Telegram voice/audio file with the local model (thinking off → text in content).
+// Transcribe a Telegram voice/audio file via the optional VOICE_* endpoint (OpenAI-compatible
+// chat with an input_audio part). Returns null on any failure → caller shows a fallback.
 async function transcribe(fileId) {
   let oga, wav;
   try {
@@ -354,15 +370,16 @@ async function transcribe(fileId) {
     wav = oga.replace(/\.[^.]+$/, ".wav");
     await ffmpegTo16kWav(oga, wav);
     const body = {
-      model: "local-model", max_tokens: 512, temperature: 0,
-      chat_template_kwargs: { enable_thinking: false },
+      model: VOICE_MODEL, max_tokens: 512, temperature: 0,
       messages: [{ role: "user", content: [
         { type: "text", text: "Transcribe the spoken audio to text. Output ONLY the exact words spoken — no preamble, no quotation marks, no commentary." },
         { type: "input_audio", input_audio: { data: readFileSync(wav).toString("base64"), format: "wav" } },
       ] }],
     };
-    const r = await fetch(LLM_URL, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body), signal: AbortSignal.timeout(120000) });
-    if (!r.ok) { log(`transcribe: llm ${r.status} ${(await r.text()).slice(0, 150)}`); return null; }
+    const headers = { "Content-Type": "application/json" };
+    if (VOICE_API_KEY) headers.Authorization = `Bearer ${VOICE_API_KEY}`;
+    const r = await fetch(VOICE_URL, { method: "POST", headers, body: JSON.stringify(body), signal: AbortSignal.timeout(120000) });
+    if (!r.ok) { log(`transcribe: ${r.status} ${(await r.text()).slice(0, 150)}`); return null; }
     return (await r.json()).choices?.[0]?.message?.content?.trim() || null;
   } catch (e) {
     log("transcribe error:", e?.message ?? e);
@@ -391,6 +408,7 @@ async function enqueue(chatId, job) {
     try {
       let prompt = j.prompt;
       if (j.voiceFileId) {
+        if (!VOICE_URL) { await sendMsg(j.chatId, "🎤 Voice transcription isn't configured (set VOICE_LLM_URL). Send text instead."); continue; }
         statusId = await sendMsg(j.chatId, "🎤 Transcribing…");
         const heard = await transcribe(j.voiceFileId);
         if (!heard) { await editMsg(j.chatId, statusId, "🎤 Sorry — couldn't transcribe that. Try again, or send text."); continue; }

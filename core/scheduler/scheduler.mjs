@@ -23,7 +23,9 @@
 import { spawn } from "node:child_process";
 import { readFileSync } from "node:fs";
 
-const MODEL = process.env.CORE_MODEL ?? "local/local-model";
+// Model is pi's own default (settings.json: defaultProvider/defaultModel). Set CORE_MODEL
+// only to override it for scheduled jobs; otherwise we pass no --model and let pi decide.
+const MODEL = process.env.CORE_MODEL ?? "";
 const EXT = "/app/.pi/extensions/context-saver.mjs";
 const FILE = process.env.SCHEDULE_FILE ?? "/app/storage/schedule.json";
 const log = (...a) => console.log("[scheduler]", ...a);
@@ -60,7 +62,8 @@ function runAgent(prompt) {
     // stdin MUST be ignored: with an open stdin pipe, `pi -p` runs but then waits on stdin
     // forever and never exits. detached → own process group for timeout-kill.
     // --no-session: scheduled jobs are stateless one-shots — don't leave a session file behind.
-    const p = spawn("pi", ["-p", prompt, "--no-session", "--model", MODEL, "-e", EXT], { cwd: "/app", detached: true, stdio: ["ignore", "pipe", "pipe"] });
+    const args = ["-p", prompt, "--no-session", ...(MODEL ? ["--model", MODEL] : []), "-e", EXT];
+    const p = spawn("pi", args, { cwd: "/app", detached: true, stdio: ["ignore", "pipe", "pipe"] });
     let out = "", err = "", done = false;
     const finish = (r) => { if (done) return; done = true; clearTimeout(timer); resolve(r); };
     const timer = setTimeout(() => {
@@ -161,6 +164,6 @@ function tick() {
   });
 }
 
-log(`starting (model=${MODEL}, schedule=${FILE})`);
+log(`starting (model=${MODEL || "pi default (settings.json)"}, schedule=${FILE})`);
 setInterval(tick, 60000);
 process.stdin.resume(); // keep the container alive
