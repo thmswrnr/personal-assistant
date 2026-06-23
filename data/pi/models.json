@@ -30,7 +30,7 @@
           "reasoning": false,
           "input": ["text", "image"],
           "contextWindow": 200000,
-          "maxTokens": 4096,
+          "maxTokens": 32768,
           "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 }
         },
         {
@@ -39,7 +39,7 @@
           "reasoning": true,
           "input": ["text", "image"],
           "contextWindow": 200000,
-          "maxTokens": 4096,
+          "maxTokens": 32768,
           "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 }
         }
       ]
