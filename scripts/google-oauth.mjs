@@ -39,7 +39,7 @@ const SCOPES = [
   "https://www.googleapis.com/auth/gmail.compose", // create drafts
   "https://www.googleapis.com/auth/gmail.modify",  // mark read/unread, label, archive (triage)
   "https://www.googleapis.com/auth/gmail.send",    // send a draft the user reviewed & approved
-  "https://www.googleapis.com/auth/drive.readonly",
+  "https://www.googleapis.com/auth/drive", // read + write: needed to MOVE processed files out of the Drive __inbox__ folder (drive.file can't touch user-created files, so the full scope is required)
   "https://www.googleapis.com/auth/calendar.events", // read + create/edit/delete calendar events
   "https://www.googleapis.com/auth/youtube.readonly",
   "https://www.googleapis.com/auth/tasks", // Google Tasks read/write — the general to-do list
