@@ -17,6 +17,11 @@ planning/
 node_modules/
 npm-debug.log*
 
+# Python local dev
+.venv/
+__pycache__/
+*.pyc
+
 # Large model weights — keep the folder, ignore the files
 data/models/*
 !data/models/.gitkeep
