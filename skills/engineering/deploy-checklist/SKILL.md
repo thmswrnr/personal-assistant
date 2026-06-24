@@ -1,0 +1,60 @@
+---
+name: deploy-checklist
+description: Pre-deployment verification checklist. Use when about to ship a release, deploying a change with database migrations or feature flags, verifying CI status and approvals before going to production, or documenting rollback triggers ahead of time.
+argument-hint: "[service or release name]"
+---
+
+# Deploy checklist
+
+Generate a pre-deployment checklist to verify readiness before shipping.
+
+## Output
+
+```markdown
+## Deploy Checklist: [Service/Release]
+**Date:** [Date] | **Deployer:** [Name]
+
+### Pre-Deploy
+- [ ] All tests passing in CI
+- [ ] Code reviewed and approved
+- [ ] No known critical bugs in release
+- [ ] Database migrations tested (if applicable)
+- [ ] Feature flags configured (if applicable)
+- [ ] Rollback plan documented
+- [ ] On-call team notified
+
+### Deploy
+- [ ] Deploy to staging and verify
+- [ ] Run smoke tests
+- [ ] Deploy to production (canary if available)
+- [ ] Monitor error rates and latency for 15 min
+- [ ] Verify key user flows
+
+### Post-Deploy
+- [ ] Confirm metrics are nominal
+- [ ] Update release notes / changelog
+- [ ] Notify stakeholders
+- [ ] Close related tickets
+
+### Rollback Triggers
+- Error rate exceeds [X]%
+- P50 latency exceeds [X]ms
+- [Critical user flow] fails
+```
+
+## Customization
+
+Tell me about your deploy and I'll customize the checklist:
+- "We use feature flags" → adds flag verification steps
+- "This includes a database migration" → adds migration-specific checks
+- "This is a breaking API change" → adds consumer notification steps
+
+## Using Core's tools
+
+- **Source control** — pull the release diff and list of changes with `git log` / `gh`, and verify all PRs are approved and merged.
+
+## Tips
+
+1. **Run before every deploy** — Even routine ones. Checklists prevent "I forgot to..."
+2. **Customize once, reuse** — Tell me your stack and I'll remember your deploy process.
+3. **Include rollback criteria** — Decide when to roll back before you deploy, not during.

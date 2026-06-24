@@ -175,6 +175,21 @@ in `skills/` (mounted to pi's config dir). Current skills:
 | `sonos` | Control a Sonos speaker — play / pause / volume / favorites. Local network; set `SONOS_HOST` (the speaker IP) in `.env`. |
 | `alan` | Ask the **Comma-Soft Alan** assistant (agentic LLM) and continue conversations. Streams the answer; pick a model (instant / thinking / GPT-5.4). Needs an API key in `data/secrets/alan_api_key`. |
 
+**Engineering** (under `skills/engineering/`) — generic software-engineering workflows, wired to Core's tools (git/`gh`, Google `tasks`, `remember`, `notify`):
+
+| Skill | What it does |
+|---|---|
+| `debug` | Structured debugging session — reproduce, isolate, diagnose, fix, prevent. |
+| `code-review` | Review a diff/PR/file for security, performance, correctness, and maintainability. |
+| `testing-strategy` | Design a test plan — pyramid balance, coverage targets, what to test vs skip. |
+| `system-design` | Design systems/services — requirements, high-level design, scale, trade-offs. |
+| `architecture` | Create or evaluate an Architecture Decision Record (ADR). |
+| `tech-debt` | Identify, categorize, and prioritize technical debt with a scoring framework. |
+| `documentation` | Write technical docs — README, API reference, runbook, architecture doc, onboarding. |
+| `deploy-checklist` | Pre-deployment verification checklist with rollback triggers. |
+| `incident-response` | Triage → communicate → mitigate → blameless postmortem. |
+| `standup` | Generate a yesterday/today/blockers standup update from recent activity. |
+
 > **Invoke skills with `/skill:<name>`** (or `./core.sh skill <name>`) for reliable execution.
 > pi uses *progressive disclosure*: only a skill's description is always in context; the full
 > `SKILL.md` loads on demand. Asked in plain language, a local model may act on the description
