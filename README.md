@@ -257,6 +257,26 @@ cron = `minute hour day-of-month month day-of-week` (local time; set via `TZ` on
 service, default `Europe/Berlin`). E.g. `0 7 * * *` daily 07:00, `30 8 * * 1-5` weekdays 08:30,
 `0 * * * *` hourly, `*/15 * * * *` every 15 min. See `core/scheduler/schedule.example.json`.
 
+### Watch-gated jobs (event-driven)
+
+Add an optional **`watch`** — a cheap shell command used as a **gate** — to turn a timed job into
+an event-driven one. With `watch` present, `cron` is just the *check cadence*: on each tick the
+watch runs (deterministic, no LLM, outside the job queue) and the `prompt` fires **only if the
+watch exits 0**. That's how file-watching and service-polling fit — the watch is the cheap "did
+anything change?" test, the prompt is the (expensive) reaction.
+
+```json
+[
+  { "label": "Inbox", "cron": "*/2 * * * *",
+    "watch": "ls /app/storage/inbox | grep -q .",
+    "prompt": "/skill:process-inbox" }
+]
+```
+
+Make the watch **edge-triggered** so it doesn't re-fire every tick — either self-clearing (the
+reaction removes the condition, e.g. `process-inbox` empties the inbox) or cursor-based (the
+script records what it last saw and exits 0 only on something newer).
+
 ---
 
 ## Telegram notifications (optional)
