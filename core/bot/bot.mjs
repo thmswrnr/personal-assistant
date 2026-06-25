@@ -22,7 +22,7 @@ const ALLOWED = process.env.TELEGRAM_CHAT_ID ? String(process.env.TELEGRAM_CHAT_
 // Core's context extensions — one dedicated concern each (spill, loop guard, memory). Loaded with
 // one -e apiece (pi's arg parser accepts repeated -e). Compaction stays native to pi.
 const EXT_DIR = "/app/.pi/extensions";
-const EXT_ARGS = ["spill", "loop-guard", "memory"].flatMap((n) => ["-e", `${EXT_DIR}/${n}.mjs`]);
+const EXT_ARGS = ["spill", "loop-guard", "tool-call-guard", "memory"].flatMap((n) => ["-e", `${EXT_DIR}/${n}.mjs`]);
 // Appended to Core's system prompt for bot runs only (the CLI stays plain markdown): the reply
 // is rendered in Telegram, which supports a small HTML subset. Keep this strict — invalid HTML
 // makes Telegram reject the message (we then fall back to plain, showing raw tags).
