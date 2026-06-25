@@ -8,39 +8,6 @@ ping you on Telegram (one-way, via the `notify` skill) — all running on your o
 Raspberry Pi talking to a hosted API; if you'd rather self-host the model, point it at a local
 server instead (see [`examples/local-models/`](examples/local-models/)).
 
-> **Status:** working end-to-end. **Model-agnostic** — set an endpoint + key + model id (three
-> values) and Core runs against any OpenAI-compatible API (hosted or self-hosted). `docker
-> compose up -d` starts the stack; you drive Core through the `./core.sh` launcher. It has real tool-calling + thinking, ~35 skills, a built-in
-> scheduler, and automatic context management. No GPU needed when you use a hosted API.
-
----
-
-## Architecture
-
-```
-                         ┌───────────────────────────┐   OpenAI-compatible    ┌─────────────────────────┐
-                         │ core  (pi harness + sched) │ ─────HTTPS (key)─────▶ │  Your LLM API           │
-   ./core.sh ──exec────▶ │ Node 22 · read/write/edit/ │                        │  (hosted, or a local    │
-                         │ bash · skills · scheduler  │                        │   server you run)       │
-                         └─────────────┬──────────────┘                        └─────────────────────────┘
-                                       │ volumes
-              ┌────────────────────────┼──────────────┐
-           data/pi   data/storage  data/secrets   skills/
-           (config)   (your files)   (tokens)    (capabilities)
-                                       │ http://searxng:8080  ┌──────────────────────┐
-                                       └────────────────────▶ │ searxng (metasearch) │
-                                                              └──────────────────────┘
-```
-
-- **`core`** — the pi harness. Talks to your model over an OpenAI-compatible API (endpoint +
-  model in `data/pi/`, key in `.env`). Runs the **scheduler** as its main process and executes
-  skills. Interactive/one-shot use attaches via `docker exec` (the `./core.sh` launcher).
-- **`searxng`** — self-hosted, private metasearch (the `websearch` skill); no API key.
-
-The model itself is **not** part of this stack — it's whatever OpenAI-compatible endpoint you
-configure. To self-host one, [`examples/local-models/`](examples/local-models/) is a standalone
-llama.cpp server you can run alongside Core or on another machine.
-
 ---
 
 ## Prerequisites
@@ -84,8 +51,9 @@ cp .env.example .env
 docker compose up -d --build       # builds + starts core + searxng (no local model service)
 ```
 
-Optional integrations: **Google** (Gmail/Drive/Calendar/YouTube) — see "Integrating external
-services"; **Telegram notifications** — see the `notify` skill; **self-hosted model** —
+Optional integrations: **Google** (Gmail/Drive/Calendar/YouTube, plus a Maps Platform key for
+static maps & directions in `google-maps`) — see "Integrating external services"; **Telegram
+notifications** — see the `notify` skill; **self-hosted model** —
 [`examples/local-models/`](examples/local-models/).
 
 > `./setup.sh` automates the common path (`.env`, SearXNG secret, optional integrations, build
@@ -105,19 +73,9 @@ services"; **Telegram notifications** — see the `notify` skill; **self-hosted 
 ```
 Inside an interactive chat, `/new` starts a fresh session and `/resume` picks a past one
 (pi built-ins). One-shot modes (`-p`, `skill`) are stateless — they save no session.
-It starts the stack if needed and loads Core's context extensions (one `-e` each). The model is
-whatever `data/pi/settings.json` selects (no `--model` flag needed).
-
-### Under the hood (equivalent raw commands)
-```bash
-docker exec core_harness pi --list-models                                     # which models are configured?
-# Core loads five small extensions, one dedicated concern each, via repeated -e:
-EXTS="-e /app/.pi/extensions/spill-to-file.mjs -e /app/.pi/extensions/loop-guard.mjs -e /app/.pi/extensions/tool-call-guard.mjs -e /app/.pi/extensions/memory.mjs -e /app/.pi/extensions/memory-capture.mjs"
-docker exec -it core_harness pi $EXTS                                          # uses settings.json default
-docker exec core_harness pi -p "/skill:process-inbox" $EXTS
-```
-
-Stop: `docker compose down`.
+It starts the stack if needed (`docker exec`s into `core_harness`, loading Core's context
+extensions via repeated `-e`) and uses the model `data/pi/settings.json` selects (no `--model`
+flag needed). Stop: `docker compose down`.
 
 ---
 
@@ -143,7 +101,9 @@ Stop: `docker compose down`.
 Skills are on-demand capability packages ([Agent Skills standard](https://agentskills.io/specification))
 — a directory with a `SKILL.md` (frontmatter `name` + `description`, then instructions) plus
 optional `scripts/` (executable code), `references/` (on-demand docs), and `assets/` subfolders,
-in `skills/` (mounted to pi's config dir). Current skills:
+grouped into category folders under `skills/` (`assistant/`, `google/`, `home/`, `web/`,
+`engineering/`; mounted to pi's config dir). Folders are just for organization — skills are
+invoked by `name`, not path. Current skills:
 
 | Skill | What it does |
 |---|---|
@@ -192,7 +152,7 @@ in `skills/` (mounted to pi's config dir). Current skills:
 > `SKILL.md` loads on demand. Asked in plain language, a local model may act on the description
 > alone and skip steps — `/skill:<name>` forces the full instructions in.
 
-Add a skill by creating `skills/<name>/SKILL.md` (+ an optional CLI in `scripts/`) and `docker compose restart core`.
+Add a skill by creating `skills/<category>/<name>/SKILL.md` (+ an optional CLI in `scripts/`) and `docker compose restart core`.
 
 ### Vision
 If your model is multimodal, Core can *see* images: drop one in `data/storage/inbox/` and run
@@ -401,23 +361,3 @@ standard key in `.env` (e.g. `OPENAI_API_KEY`) and put `"<provider>/<id>"` in `s
 Run [`examples/local-models/`](examples/local-models/) (a standalone llama.cpp server — same
 machine or another), then set the `api` provider's `baseUrl` to it and `defaultModel` to its
 alias. Same three knobs; the only difference is the endpoint is yours.
-
----
-
-## Troubleshooting
-
-- **Skill only half-runs / steps skipped** — invoke it as `/skill:<name>` so the full `SKILL.md`
-  loads into context (see "Skills").
-- **`EACCES` writing under `/app/.pi`** — leftover root-owned files from an earlier run:
-  `docker exec -u 0 core_harness chown -R node:node /app/.pi`.
-- **pi can't reach the model** — check the `api` provider's `baseUrl` in `models.json` and that
-  `LLM_API_KEY` is set. Test directly: `docker exec core_harness pi --list-models` then
-  `pi -p "hi"`. For a self-hosted endpoint, remember Core runs in a container — use
-  `host.docker.internal` (same host) or the LAN IP, not `localhost`.
-- **Model id mismatch** — the `id` in `models.json` / `defaultModel` must match what the API
-  actually serves (for `examples/local-models/`, that's the `LLAMA_ARG_ALIAS`).
-- **Auth errors (401/403)** — wrong or missing `LLM_API_KEY`, or a built-in provider whose key
-  env var has a different name (check `pi --list-models`).
-- **Agent narrates tool calls instead of running them** — the model lacks usable tool-calling.
-  Use a function-calling-capable instruct model.
-- **websearch errors** — the `searxng` container must be up and `SEARXNG_SECRET` set in `.env`.
