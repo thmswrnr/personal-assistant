@@ -81,13 +81,12 @@ fi
 
 # ── 5. Optional integrations (configure only what you want) ───────────────────────────
 bold "5/6  Optional integrations — skip any you don't use (just press Enter)"
-USE_TELEGRAM=no
-
-if yesno "Telegram bridge (chat with Core from your phone + notify)?"; then
+if yesno "Telegram notifications (one-way pings via the notify skill)?"; then
   t="$(askval "Bot token from @BotFather" secret)"
-  [ -n "$t" ] && { set_env TELEGRAM_BOT_TOKEN "$t"; USE_TELEGRAM=yes; ok "token saved"; \
-    info "After it starts: message your bot, run '$DC logs core_bot' to get your chat id,"; \
-    info "set TELEGRAM_CHAT_ID in .env, then re-run this script (or restart the bot)."; } \
+  [ -n "$t" ] && { set_env TELEGRAM_BOT_TOKEN "$t"; ok "token saved"; \
+    info "Message your bot once, then get your chat id with:"; \
+    info "  curl -s \"https://api.telegram.org/bot<TOKEN>/getUpdates\" | grep -o '\"chat\":{\"id\":[0-9-]*'"; \
+    info "Set TELEGRAM_CHAT_ID in .env."; } \
     || warn "no token entered — Telegram left off"
 fi
 
@@ -153,9 +152,8 @@ fi
 # every run; that means it must be (re)installed per clone, here. Idempotent.
 SUBAGENTS_PKG="npm:@tintinweb/pi-subagents@0.10.3"
 
-PROFILE=(); [ "$USE_TELEGRAM" = yes ] && PROFILE=(--profile telegram)
 if yesno "Build the image and start the stack now?" y; then
-  $DC "${PROFILE[@]}" up -d --build
+  $DC up -d --build
   ok "stack starting (core + searxng)"
   if docker exec core_harness pi install "$SUBAGENTS_PKG" >/dev/null 2>&1; then
     ok "subagent extension installed ($SUBAGENTS_PKG)"
@@ -164,12 +162,11 @@ if yesno "Build the image and start the stack now?" y; then
     info "  docker exec core_harness pi install $SUBAGENTS_PKG"
   fi
 else
-  info "When ready:  $DC ${PROFILE[*]} up -d --build"
+  info "When ready:  $DC up -d --build"
   info "Then enable subagents:  docker exec core_harness pi install $SUBAGENTS_PKG"
 fi
 
 bold "Done."
 info "Talk to Core:        ./core.sh         (or ./core.sh --continue to resume)"
 info "Run a skill:         ./core.sh skill morning-briefing"
-[ "$USE_TELEGRAM" = yes ] && info "Telegram bridge:     started (set TELEGRAM_CHAT_ID then restart if you haven't)"
 info "Re-run this script anytime to add an integration — it won't overwrite what's set."

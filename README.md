@@ -4,14 +4,13 @@ Core is a self-hosted assistant: the [**pi**](https://github.com/earendil-works/
 harness in Docker, driving **any OpenAI-compatible LLM**, sharing a set of folders on your
 machine. It reads and organizes your documents, keeps a "second brain," reaches services you
 connect (Gmail, Drive, Calendar, YouTube, the web), runs recurring jobs on a schedule, and can
-reach you on Telegram — all running on your own box. The harness is tiny, so it's happy on a
+ping you on Telegram (one-way, via the `notify` skill) — all running on your own box. The harness is tiny, so it's happy on a
 Raspberry Pi talking to a hosted API; if you'd rather self-host the model, point it at a local
 server instead (see [`examples/local-models/`](examples/local-models/)).
 
 > **Status:** working end-to-end. **Model-agnostic** — set an endpoint + key + model id (three
 > values) and Core runs against any OpenAI-compatible API (hosted or self-hosted). `docker
-> compose up -d` starts the stack; you drive Core through the `./core.sh` launcher (and
-> optionally a Telegram bot). It has real tool-calling + thinking, ~15 skills, a built-in
+> compose up -d` starts the stack; you drive Core through the `./core.sh` launcher. It has real tool-calling + thinking, ~35 skills, a built-in
 > scheduler, and automatic context management. No GPU needed when you use a hosted API.
 
 ---
@@ -22,7 +21,7 @@ server instead (see [`examples/local-models/`](examples/local-models/)).
                          ┌───────────────────────────┐   OpenAI-compatible    ┌─────────────────────────┐
                          │ core  (pi harness + sched) │ ─────HTTPS (key)─────▶ │  Your LLM API           │
    ./core.sh ──exec────▶ │ Node 22 · read/write/edit/ │                        │  (hosted, or a local    │
-   (Telegram bot ─────▶) │ bash · skills · scheduler  │                        │   server you run)       │
+                         │ bash · skills · scheduler  │                        │   server you run)       │
                          └─────────────┬──────────────┘                        └─────────────────────────┘
                                        │ volumes
               ┌────────────────────────┼──────────────┐
@@ -37,7 +36,6 @@ server instead (see [`examples/local-models/`](examples/local-models/)).
   model in `data/pi/`, key in `.env`). Runs the **scheduler** as its main process and executes
   skills. Interactive/one-shot use attaches via `docker exec` (the `./core.sh` launcher).
 - **`searxng`** — self-hosted, private metasearch (the `websearch` skill); no API key.
-- **`bot`** — *optional* Telegram bridge (off unless you enable its profile).
 
 The model itself is **not** part of this stack — it's whatever OpenAI-compatible endpoint you
 configure. To self-host one, [`examples/local-models/`](examples/local-models/) is a standalone
@@ -79,7 +77,7 @@ cp .env.example .env
 # in .env:  LLM_API_KEY=...                       # your model API key
 #           SEARXNG_SECRET=$(openssl rand -hex 32) # websearch container
 ```
-`TELEGRAM_*`, `VOICE_*`, and per-skill keys are optional — see below.
+`TELEGRAM_*` (for the `notify` skill) and per-skill keys are optional — see below.
 
 ### 3. Start
 ```bash
@@ -87,7 +85,7 @@ docker compose up -d --build       # builds + starts core + searxng (no local mo
 ```
 
 Optional integrations: **Google** (Gmail/Drive/Calendar/YouTube) — see "Integrating external
-services"; **Telegram** — see "Telegram bridge"; **self-hosted model** —
+services"; **Telegram notifications** — see the `notify` skill; **self-hosted model** —
 [`examples/local-models/`](examples/local-models/).
 
 > `./setup.sh` automates the common path (`.env`, SearXNG secret, optional integrations, build
@@ -113,8 +111,8 @@ whatever `data/pi/settings.json` selects (no `--model` flag needed).
 ### Under the hood (equivalent raw commands)
 ```bash
 docker exec core_harness pi --list-models                                     # which models are configured?
-# Core loads three small extensions, one dedicated concern each, via repeated -e:
-EXTS="-e /app/.pi/extensions/spill.mjs -e /app/.pi/extensions/loop-guard.mjs -e /app/.pi/extensions/memory.mjs"
+# Core loads four small extensions, one dedicated concern each, via repeated -e:
+EXTS="-e /app/.pi/extensions/spill.mjs -e /app/.pi/extensions/loop-guard.mjs -e /app/.pi/extensions/tool-call-guard.mjs -e /app/.pi/extensions/memory.mjs"
 docker exec -it core_harness pi $EXTS                                          # uses settings.json default
 docker exec core_harness pi -p "/skill:process-inbox" $EXTS
 ```
@@ -132,7 +130,7 @@ Stop: `docker compose down`.
 | `data/secrets/` | `/app/secrets` | OAuth creds / tokens (git-ignored) |
 | `data/models/` | — | GGUF files, only if you self-host via `examples/local-models/` (unused by Core's stack) |
 | `skills/` | `/app/.pi/skills` | `SKILL.md` capability packages (version-controlled) |
-| `core/` | — | the core image (`Dockerfile`) + its runtime scripts (`scheduler/`, `bot/`) |
+| `core/` | — | the core image (`Dockerfile`) + its runtime script (`scheduler/`) |
 | `searxng/` | `/etc/searxng` (in `searxng`) | SearXNG config |
 
 `data/` contents are git-ignored (only the authored config — `models.json`, `SYSTEM.md`, and the
@@ -197,15 +195,10 @@ in `skills/` (mounted to pi's config dir). Current skills:
 
 Add a skill by creating `skills/<name>/SKILL.md` (+ an optional CLI in `scripts/`) and `docker compose restart core`.
 
-### Vision & voice
+### Vision
 If your model is multimodal, Core can *see* images: drop one in `data/storage/inbox/` and run
 `process-inbox` (it reads receipts/screenshots/photos and files them), or point pi's `read` tool
-at an image file. Over the Telegram bridge you can also send photos (analysed via vision).
-
-**Voice notes** are transcribed by an **optional, separate** audio endpoint — set `VOICE_LLM_URL`
-(+ `VOICE_MODEL`, and `VOICE_API_KEY` if needed) to any OpenAI-compatible audio-capable model. If
-unset, voice notes are politely skipped. (A self-hosted [`examples/local-models/`](examples/local-models/)
-server with the Gemma projector can back this — it handles audio too.)
+at an image file.
 
 ---
 
@@ -219,8 +212,8 @@ pi extension (a Claude Code-style `Agent` tool), installed by `setup.sh` (pinned
 
 Unlike the bundled `extensions/` (loaded explicitly with `-e`, e.g. spill/memory), this is an
 installed **pi package**: `setup.sh` runs `pi install` once, which registers it in
-`data/pi/settings.json` so pi **auto-loads it on every run** — CLI, the Telegram bridge, and
-scheduled jobs alike. No launcher flags needed. To (re)install by hand:
+`data/pi/settings.json` so pi **auto-loads it on every run** — CLI and scheduled jobs alike.
+No launcher flags needed. To (re)install by hand:
 
 ```bash
 docker exec core_harness pi install npm:@tintinweb/pi-subagents@0.10.3
@@ -236,7 +229,7 @@ pin its own (e.g. a faster/cheaper id for the lightweight `fetch`/`Explore` work
 
 ## Memory (long-term)
 
-Core runs are **stateless** — every command, scheduled job, and Telegram message is a fresh `pi`
+Core runs are **stateless** — every command and scheduled job is a fresh `pi`
 process. Long-term memory is how durable facts survive that: they're recorded as small files
 under `data/storage/memory/` (one fact per file), with an auto-generated `MEMORY.md` **index**.
 
@@ -266,6 +259,9 @@ To keep the model's context lean over long sessions:
   discard that, so we leave compaction to pi.
 - **Loop guard** (`data/pi/extensions/loop-guard.mjs`) — if the model issues the same tool call
   several times in a row with no new outcome, a corrective nudge is appended so it breaks out.
+- **Tool-call guard** (`data/pi/extensions/tool-call-guard.mjs`) — if the model leaks a raw
+  `<|tool_call|>` token as plain text (an upstream parse miss) instead of making a real tool
+  call, a corrective nudge is injected so it retries; capped so it never loops.
 
 ---
 
@@ -299,25 +295,20 @@ service, default `Europe/Berlin`). E.g. `0 7 * * *` daily 07:00, `30 8 * * 1-5` 
 
 ---
 
-## Telegram bridge (optional)
+## Telegram notifications (optional)
 
-Chat with Core from your phone, and let it `notify` you. **Optional** — Core and the scheduler
-run fine without it.
+Core can ping you on Telegram via the `notify` skill (and scheduled jobs, e.g. the morning
+briefing). This is **outbound-only** — there is no interactive bot. **Optional** — Core runs
+fine without it.
 
 1. Create a bot with **@BotFather**, put the token in `.env` as `TELEGRAM_BOT_TOKEN`.
-2. Start the bridge:  `docker compose --profile telegram up -d bot`
-3. Message your bot once, then `docker logs core_bot` — it prints your chat id. Put it in `.env`
-   as `TELEGRAM_CHAT_ID` and run the start command again.
+2. Message your bot once, then read your chat id and set it in `.env` as `TELEGRAM_CHAT_ID`:
+   ```bash
+   curl -s "https://api.telegram.org/bot<TOKEN>/getUpdates" | grep -o '"chat":{"id":[0-9-]*'
+   ```
 
-Texts, **voice notes** (transcribed via the optional `VOICE_*` endpoint), and **photos** (read
-via vision) all run through Core and get a reply; the bot acks instantly, streams the answer in
-as it's written, and shows
-which tool/skill is running. The `notify` skill (and scheduled tasks) can message you too. The
-bridge is **locked to your chat id** — it ignores everyone else.
-
-Your chat is **one ongoing conversation** — Core remembers the prior turns (so follow-ups like
-"and what about tomorrow?" work), and it survives bot restarts. Send **`/new`** (or `/reset`)
-to clear the context and start fresh.
+Messages are **locked to your chat id**. (A two-way chat bridge previously existed and was
+removed; a new one may be built later.)
 
 ---
 
@@ -337,9 +328,9 @@ Adding a service, by case:
 1. **Pure API (HTTP + JSON)** → a small **self-contained Node CLI** in the skill's `scripts/` folder (the
    image has `node`, `curl`, `jq` — **no rebuild**). The CLI holds the credential and calls the
    API, so the token never enters the model's context. Most skills are this case.
-2. **A mature official CLI exists** (e.g. `gh`, `yt-dlp`, `ffmpeg`) → install it in
+2. **A mature official CLI exists** (e.g. `gh`, `yt-dlp`) → install it in
    **`core/Dockerfile`** (pinned) and rebuild once; the `SKILL.md` documents how to call it.
-   Already baked in: **`yt-dlp`** (youtube), **`gh`** (github-pages), **`ffmpeg`** (voice),
+   Already baked in: **`yt-dlp`** (youtube), **`gh`** (github-pages),
    **`sonos`** (sonos — compiled from source in a
    multi-stage build, since upstream ships macOS binaries only), and **`@playwright/cli` +
    headless Chrome** (browser). Most are tiny and
@@ -387,7 +378,7 @@ Edit three things, all in `data/pi/`:
 2. **`.env`** → `LLM_API_KEY=…` (a self-hosted server ignores it; any value is fine).
 3. **`settings.json`** → `defaultModel` = the id you want as the default.
 
-Apply: `docker compose restart core` (and `bot`, if running). Verify:
+Apply: `docker compose restart core`. Verify:
 ```bash
 docker exec core_harness pi --list-models
 docker exec core_harness pi -p "hi"

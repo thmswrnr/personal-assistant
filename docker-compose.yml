@@ -33,32 +33,6 @@ services:
     networks:
       - core_network
 
-  bot:
-    # OPTIONAL Telegram bridge — chat with Core from your phone. Core runs fine without it.
-    # Opt-in via its profile so a plain `docker compose up` (and core.sh) does NOT start it:
-    #   docker compose --profile telegram up -d bot
-    # Reuses the core image (has pi + tooling); just runs the bridge script instead.
-    profiles: ["telegram"]
-    build:
-      context: ./core
-      dockerfile: Dockerfile
-    container_name: core_bot
-    user: "node"
-    volumes:
-      - ./data/pi:/app/.pi:rw
-      - ./data/storage:/app/storage:rw
-      - ./data/secrets:/app/secrets:rw
-      - ./skills:/app/.pi/skills:ro
-      - ./core/bot/bot.mjs:/app/bot/bot.mjs:ro
-    env_file:
-      - .env
-    environment:
-      - PI_CODING_AGENT_DIR=/app/.pi
-      - TZ=Europe/Berlin
-    command: ["node", "/app/bot/bot.mjs"]
-    networks:
-      - core_network
-
   searxng:
     # Self-hosted metasearch for the websearch skill. Internal-only (no host port) —
     # reachable by core/ui at http://searxng:8080. Pinned by digest for reproducibility.

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Send the user a file (document/image/etc.) on Telegram. Hard-limited to the user's own
-// chat (TELEGRAM_CHAT_ID) — same bot token as notify.mjs / the Telegram bridge. It cannot
+// chat (TELEGRAM_CHAT_ID) — same bot token as notify.mjs. It cannot
 // send to anyone else. No third-party deps (Node built-in fetch/FormData/Blob).
 //
 // Usage:

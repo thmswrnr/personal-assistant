@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Send the user a Telegram notification. Hard-limited to the user's own chat
-// (TELEGRAM_CHAT_ID) — it cannot message anyone else. Uses the same bot token as the
-// Telegram bridge. No third-party deps (Node built-in fetch).
+// (TELEGRAM_CHAT_ID) — it cannot message anyone else. Outbound-only via the Telegram
+// Bot API (no interactive bot). No third-party deps (Node built-in fetch).
 //
 // Usage:
 //   node notify.mjs "your message text"

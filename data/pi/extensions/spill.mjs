@@ -5,7 +5,7 @@
 // Non-JSON prose is left inline — pi's native compaction keeps the conversation bounded.
 //
 // One dedicated concern, loaded via its own `-e` on every Core entry point (interactive
-// core.sh, the Telegram bot, the scheduler, and one-off runs). See also [[loop-guard]],
+// core.sh, the scheduler, and one-off runs). See also [[loop-guard]],
 // [[memory]], [[compaction]].
 import { writeFileSync, mkdirSync } from "node:fs";
 
