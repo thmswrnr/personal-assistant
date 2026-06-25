@@ -107,7 +107,7 @@ invoked by `name`, not path. Current skills:
 
 | Skill | What it does |
 |---|---|
-| `gmail` | Read email (search / read / labels) **and create drafts** — never sends. Gmail API. |
+| `gmail` | Read email (search / read / labels), **create drafts**, **send a draft you approved**, and **triage** (mark read/unread, label, archive). Sending & label changes only on your explicit instruction. Gmail API. |
 | `drive` | Read Google Drive (list / search / read; Docs→text, Sheets→CSV). Read-only. |
 | `calendar` | Google Calendar — list / agenda / today / search, **and create / edit / delete events** (confirms before writing). |
 | `sheets` | Google Sheets — create a spreadsheet, read a range, append rows, overwrite cells. Confirms before writing. |
@@ -329,15 +329,25 @@ metadata:
 Credentials live in `data/secrets/` (git-ignored), read by the CLI — never through the model.
 Prefer **read-only** scopes and least privilege.
 
-### Google setup (one time) — Gmail, Drive, Calendar, YouTube
+### Google setup (one time) — Gmail, Drive, Calendar, Tasks, Sheets, Docs, YouTube
 
-The Google skills share one OAuth token. In Google Cloud:
+The Google skills (`gmail`, `drive`, `calendar`, `tasks`, `sheets`, `docs`, `youtube`) share one
+OAuth token. In Google Cloud:
 
-1. **Enable the APIs** you use: Gmail, Google Drive, Google Calendar, YouTube Data API v3.
-   (A scope only appears in the consent screen's picker *after* its API is enabled.)
+1. **Enable the APIs** you use: Gmail, Google Drive, Google Calendar, Google Tasks, Google
+   Sheets, Google Docs, YouTube Data API v3. (A scope only appears in the consent screen's
+   picker *after* its API is enabled.)
 2. Create a **Web application** OAuth client, redirect URI `http://localhost:4100/oauth2callback`,
-   and add the scopes: `gmail.readonly`, `gmail.compose` (drafts only — never sends),
-   `drive.readonly`, `calendar.readonly`, `youtube.readonly`. Add yourself as a test user.
+   and add the scopes (the authoritative list lives in `scripts/google-oauth.mjs`):
+   - `gmail.readonly`, `gmail.compose`, `gmail.modify` (triage: read/unread, label, archive),
+     `gmail.send` (send a draft **you** reviewed — never unprompted)
+   - `drive` (full: needed to *move* processed files out of the Drive inbox folder)
+   - `calendar.events` (read + create/edit/delete events)
+   - `youtube.readonly`
+   - `tasks` (Google Tasks read/write), `spreadsheets` (Sheets read/write), `documents` (Docs read/write)
+
+   Every write (send, label, edit, delete) is gated behind a confirm-with-you rule in the skill.
+   Add yourself as a test user.
 3. Download the client JSON to `data/secrets/google_client_secret.json`.
 
 Then run on the host:
