@@ -111,8 +111,8 @@ whatever `data/pi/settings.json` selects (no `--model` flag needed).
 ### Under the hood (equivalent raw commands)
 ```bash
 docker exec core_harness pi --list-models                                     # which models are configured?
-# Core loads four small extensions, one dedicated concern each, via repeated -e:
-EXTS="-e /app/.pi/extensions/spill-to-file.mjs -e /app/.pi/extensions/loop-guard.mjs -e /app/.pi/extensions/tool-call-guard.mjs -e /app/.pi/extensions/memory.mjs"
+# Core loads five small extensions, one dedicated concern each, via repeated -e:
+EXTS="-e /app/.pi/extensions/spill-to-file.mjs -e /app/.pi/extensions/loop-guard.mjs -e /app/.pi/extensions/tool-call-guard.mjs -e /app/.pi/extensions/memory.mjs -e /app/.pi/extensions/memory-capture.mjs"
 docker exec -it core_harness pi $EXTS                                          # uses settings.json default
 docker exec core_harness pi -p "/skill:process-inbox" $EXTS
 ```
@@ -167,12 +167,12 @@ in `skills/` (mounted to pi's config dir). Current skills:
 | `project-planning` | Break any task/problem into a structured plan; saves real projects to their own `storage/projects/<slug>/` folder (`plan.md` + a plain-markdown `todos.md`). |
 | `haushaltsbuch` | Log expenses to your `haushaltsbuch<year>` Google Sheet — classifies receipt items by category, sums per category, appends one row per category to the "Variable Ausgaben" tab. Markdown-only skill on top of `sheets`. |
 | `skill-builder` | Lets Core author or modify its **own** skills — only on explicit request, shown for approval before writing, into the writable `custom_skills/` area (curated skills stay read-only). |
-| `remember` | Save / recall / forget durable facts (Core's long-term memory — see below). |
+| `memory` | Save / recall / forget durable facts — and **auto-captures** them at the end of a chat (Core's long-term memory — see below). |
 | `github-pages` | Publish a static site to GitHub Pages (create repo → push → enable Pages). Needs a PAT in `data/secrets/github_token`. |
 | `sonos` | Control a Sonos speaker — play / pause / volume / favorites. Local network; set `SONOS_HOST` (the speaker IP) in `.env`. |
 | `alan` | Ask the **Comma-Soft Alan** assistant (agentic LLM) and continue conversations. Streams the answer; pick a model (instant / thinking / GPT-5.4). Needs an API key in `data/secrets/alan_api_key`. |
 
-**Engineering** (under `skills/engineering/`) — generic software-engineering workflows, wired to Core's tools (git/`gh`, Google `tasks`, `remember`, `notify`):
+**Engineering** (under `skills/engineering/`) — generic software-engineering workflows, wired to Core's tools (git/`gh`, Google `tasks`, `memory`, `notify`):
 
 | Skill | What it does |
 |---|---|
@@ -236,9 +236,14 @@ under `data/storage/memory/` (one fact per file), with an auto-generated `MEMORY
   into the system prompt on **every** run — zero tool calls, always present. Full fact files are
   read on demand only when relevant — the same *progressive disclosure* as skills, so context
   stays lean.
-- The `remember` skill captures facts: `save` / `forget` / `list`, with the index regenerated on
-  every change (so it can't drift). Core saves a fact when you ask ("remember that…") or when a
-  clearly durable preference/fact emerges — not one-off details.
+- The `memory` skill is the store: `save` / `forget` / `list`, with the index regenerated on
+  every change (so it can't drift). You save a fact by asking ("remember that…").
+- The `memory-capture.mjs` extension adds **autonomous capture**: at the end of an interactive
+  session it runs a one-shot extraction pass (a fast Alan model, no tools, in a sub-process that
+  can't recurse) over the conversation and *silently* saves any durable personal facts through
+  the same store — deduped against the index and gated to skip one-offs/ephemeral details.
+  Stateless one-shot / scheduled runs don't trigger it. Pruning stale facts stays a manual task
+  (`memory forget`).
 
 The payoff: a scheduled `notify` or a one-off command runs with your preferences and key facts
 already in context — no re-asking, no stale assumptions.

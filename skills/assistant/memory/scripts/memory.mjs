@@ -4,10 +4,10 @@
 // from the fact files on every change so it can never drift or get corrupted.
 //
 // Usage:
-//   remember.mjs save --slug <kebab> --type <user|preference|project|reference> \
+//   memory.mjs save --slug <kebab> --type <user|preference|project|reference> \
 //                      --desc "<one-line, for recall>" --body "<the fact>"
-//   remember.mjs forget --slug <kebab>
-//   remember.mjs list
+//   memory.mjs forget --slug <kebab>
+//   memory.mjs list
 //
 // The memory dir is /app/storage/memory (override with CORE_MEMORY_DIR for tests).
 import { readFileSync, writeFileSync, readdirSync, mkdirSync, rmSync, existsSync } from "node:fs";
@@ -55,7 +55,7 @@ function reindex() {
   };
   let out =
     "# Core — Long-term memory (index)\n" +
-    "<!-- Auto-generated from the fact files in this folder by the `remember` skill. Don't edit by hand. -->\n";
+    "<!-- Auto-generated from the fact files in this folder by the `memory` skill. Don't edit by hand. -->\n";
   for (const t of TYPES) {
     const group = facts.filter((x) => x.type === t);
     if (!group.length) continue;

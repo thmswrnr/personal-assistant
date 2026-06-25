@@ -45,6 +45,7 @@ data/pi/extensions/*
 !data/pi/extensions/loop-guard.mjs
 !data/pi/extensions/tool-call-guard.mjs
 !data/pi/extensions/memory.mjs
+!data/pi/extensions/memory-capture.mjs
 # Track our custom subagent definitions (they inherit Core's model unless they pin one)
 !data/pi/agents/
 !data/pi/agents/*.md

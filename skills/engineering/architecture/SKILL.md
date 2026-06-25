@@ -62,7 +62,7 @@ See the **system-design** skill for detailed frameworks on requirements gatherin
 
 ## Using Core's tools
 
-- **Knowledge base** (`remember` skill / `artefacts/`) — search the second brain for prior ADRs, design docs, and relevant technical context.
+- **Knowledge base** (`memory` skill / `artefacts/`) — search the second brain for prior ADRs, design docs, and relevant technical context.
 - **Tasks** (`tasks` skill) — turn the ADR's action items into Google Tasks.
 
 ## Tips

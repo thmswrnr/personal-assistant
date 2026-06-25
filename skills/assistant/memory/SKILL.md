@@ -1,5 +1,5 @@
 ---
-name: remember
+name: memory
 description: Save, update, or remove a durable fact in Core's long-term memory — things worth recalling across sessions (the user's preferences, key facts about them, ongoing projects, useful references). Use when the user says "remember that…", "from now on…", "forget that…", or when a clearly durable fact/preference emerges in conversation. NOT for one-off or ephemeral details.
 metadata:
   {
@@ -8,7 +8,7 @@ metadata:
   }
 ---
 
-# Remember (long-term memory)
+# Memory (long-term)
 
 Core's memory is a folder of small fact files under `storage/memory/`, plus an auto-generated
 `MEMORY.md` index that is loaded into **every** run (interactive, scheduled, and Telegram).
@@ -23,17 +23,17 @@ relying on it.
 
 ```bash
 # Save (or update) a fact. --slug is a stable kebab-case id; re-saving the same slug overwrites it.
-node /app/.pi/skills/assistant/remember/scripts/remember.mjs save \
+node /app/.pi/skills/assistant/memory/scripts/memory.mjs save \
   --slug user-city \
   --type user \
   --desc "where the user lives — base for weather, commute, briefings" \
   --body "Bonn, Germany."
 
 # Remove a fact
-node /app/.pi/skills/assistant/remember/scripts/remember.mjs forget --slug user-city
+node /app/.pi/skills/assistant/memory/scripts/memory.mjs forget --slug user-city
 
 # Show the current index
-node /app/.pi/skills/assistant/remember/scripts/remember.mjs list
+node /app/.pi/skills/assistant/memory/scripts/memory.mjs list
 ```
 
 `--type` is one of: `user` (who they are), `preference` (how they like things done),

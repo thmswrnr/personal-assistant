@@ -30,7 +30,7 @@ thing brief and scannable, not a wall of text.
 4. **Weather.** Use the **weather** skill to get today's forecast for the user's home city.
    - Give a one-liner: current temp + conditions and today's high/low, and call out rain
      if the chance is notable (e.g. "pack an umbrella").
-   - If you don't know the user's city, ask once and save it with `/skill:remember` (so future
+   - If you don't know the user's city, ask once and save it with `/skill:memory` (so future
      briefings have it); skip this step gracefully if it's still unknown or it's unavailable.
 
 5. **Joke.** Tell one short, clean joke.

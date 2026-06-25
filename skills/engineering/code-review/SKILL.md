@@ -92,7 +92,7 @@ Review the code changes the user points to — a diff, a PR URL (fetch it with `
 
 - **Source control** — pull the PR diff with `gh pr diff <url>` (or `git diff`), and verify the change addresses its stated requirements.
 - **Tasks** (`tasks` skill) — link findings to related Google Tasks items, or open a task for follow-up fixes.
-- **Knowledge base** (`remember` skill / `artefacts/`) — check the change against any coding standards or notes saved in the second brain.
+- **Knowledge base** (`memory` skill / `artefacts/`) — check the change against any coding standards or notes saved in the second brain.
 
 ## Tips
 

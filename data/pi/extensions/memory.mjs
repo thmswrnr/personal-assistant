@@ -30,7 +30,7 @@ export default function register(pi) {
       "Durable facts you've saved about the user and ongoing work. Each line links a file " +
       "under `storage/memory/`; when a line looks relevant to the request, READ that file " +
       "for the full detail before relying on it. To record a new durable fact (or correct/" +
-      "remove one), use `/skill:remember` — do this when the user tells you to remember " +
+      "remove one), use `/skill:memory` — do this when the user tells you to remember " +
       "something, or when a clearly durable fact or preference emerges. Don't save " +
       "one-off/ephemeral details.\n\n" +
       index;
