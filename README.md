@@ -34,9 +34,8 @@ This is the whole model setup. Core talks to one **generic OpenAI-compatible pro
 3. **Model id** — list it under the `api` provider's `models[]`, and set
    `data/pi/settings.json` → `defaultModel` to it.
 
-> Prefer one of pi's **built-in** providers (anthropic / openai / gemini / …)? You don't need
-> the `api` entry at all — set that provider's standard key in `.env`, and put
-> `"<provider>/<id>"` in `settings.json`. Confirm names with `pi --list-models`.
+> Using a pi **built-in** provider (anthropic / openai / gemini / …) or self-hosting a model?
+> See [Adding or switching a model](#adding-or-switching-a-model).
 
 ### 2. Environment
 ```bash
@@ -108,7 +107,7 @@ invoked by `name`, not path. Current skills:
 | Skill | What it does |
 |---|---|
 | `gmail` | Read email (search / read / labels), **create drafts**, **send a draft you approved**, and **triage** (mark read/unread, label, archive). Sending & label changes only on your explicit instruction. Gmail API. |
-| `drive` | Read Google Drive (list / search / read; Docs→text, Sheets→CSV). Read-only. |
+| `drive` | Read Google Drive (list / search / read; Docs→text, Sheets→CSV). |
 | `calendar` | Google Calendar — list / agenda / today / search, **and create / edit / delete events** (confirms before writing). |
 | `sheets` | Google Sheets — create a spreadsheet, read a range, append rows, overwrite cells. Confirms before writing. |
 | `docs` | Google Docs — create a doc, read its text, append text. Confirms before writing. |
@@ -291,8 +290,7 @@ fine without it.
    curl -s "https://api.telegram.org/bot<TOKEN>/getUpdates" | grep -o '"chat":{"id":[0-9-]*'
    ```
 
-Messages are **locked to your chat id**. (A two-way chat bridge previously existed and was
-removed; a new one may be built later.)
+Messages are **locked to your chat id**.
 
 ---
 
@@ -346,7 +344,6 @@ OAuth token. In Google Cloud:
    - `youtube.readonly`
    - `tasks` (Google Tasks read/write), `spreadsheets` (Sheets read/write), `documents` (Docs read/write)
 
-   Every write (send, label, edit, delete) is gated behind a confirm-with-you rule in the skill.
    Add yourself as a test user.
 3. Download the client JSON to `data/secrets/google_client_secret.json`.
 
@@ -361,33 +358,23 @@ which scopes were granted** — re-run it whenever you add a skill that needs a 
 
 ## Adding or switching a model
 
-Core is model-agnostic. Switching models is config-only — no code changes.
+Model setup is config-only — no code changes. The three values are in
+[Setup](#1-point-core-at-your-model--three-values); switching later just means editing them and
+restarting. After any change run `docker compose restart core`, then verify:
 
-### The generic `api` provider (default path)
-Edit three things, all in `data/pi/`:
-
-1. **`models.json`** → the `api` provider's `baseUrl` (your OpenAI-compatible endpoint) and its
-   `models[]` (each `id` is what the API expects; `reasoning: true` for thinking models,
-   `input: ["text","image"]` only for multimodal).
-2. **`.env`** → `LLM_API_KEY=…` (a self-hosted server ignores it; any value is fine).
-3. **`settings.json`** → `defaultModel` = the id you want as the default.
-
-Apply: `docker compose restart core`. Verify:
 ```bash
 docker exec core_harness pi --list-models
 docker exec core_harness pi -p "hi"
 ```
 
-> **Tool calling** needs a model whose chat template supports tools (Gemma 3/4, Qwen3,
-> Llama 3.1+, Mistral-Nemo, most hosted instruct models, …). Models without it *narrate* tool
-> calls as text instead of executing them.
-
-### A pi built-in provider (e.g. OpenAI, Anthropic, Gemini)
-pi ships a provider catalog, so you can skip the `api` entry entirely: set that provider's
-standard key in `.env` (e.g. `OPENAI_API_KEY`) and put `"<provider>/<id>"` in `settings.json`
-`defaultModel`. Check exact names with `docker exec core_harness pi --list-models`.
-
-### Self-hosting the model
-Run [`examples/local-models/`](examples/local-models/) (a standalone llama.cpp server — same
-machine or another), then set the `api` provider's `baseUrl` to it and `defaultModel` to its
-alias. Same three knobs; the only difference is the endpoint is yours.
+- **Model entry** — in `models.json`, each model `id` is what the API expects; add
+  `reasoning: true` for thinking models and `input: ["text","image"]` for multimodal.
+- **Tool calling** — needs a model whose chat template supports it (Gemma 3/4, Qwen3,
+  Llama 3.1+, Mistral-Nemo, most hosted instruct models). Without it the model *narrates* tool
+  calls as text instead of executing them.
+- **pi built-in provider** (openai / anthropic / gemini / …) — skip the `api` entry entirely:
+  set that provider's standard key in `.env` (e.g. `OPENAI_API_KEY`) and put `"<provider>/<id>"`
+  in `settings.json` `defaultModel`. Confirm exact names with `pi --list-models`.
+- **Self-hosting** — run [`examples/local-models/`](examples/local-models/) (a standalone
+  llama.cpp server), point the `api` provider's `baseUrl` at it, and set `defaultModel` to its
+  alias. Same three values; only the endpoint is yours.
