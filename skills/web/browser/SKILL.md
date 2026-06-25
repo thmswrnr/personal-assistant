@@ -18,11 +18,12 @@ page's content, so you read a page by reading it, not by screenshotting (see "Re
 The browser is a **fresh, sandboxed session — not logged into any of the user's accounts.**
 
 ## The loop
-Use one session id (`-s=core`) so all calls share the same browser:
+Use one session id (`-s=core`) so all calls share the same browser. Always launch with
+`--browser=webkit` on `open` (the CLI's default is the Chrome channel, which isn't installed here):
 ```bash
 B="playwright-cli -s=core"
 
-$B open "https://example.com"     # launch (headless) + navigate; prints title/url + a snapshot
+$B open --browser=webkit "https://example.com"   # launch (headless) + navigate; prints title/url + a snapshot
 $B snapshot                       # re-capture element refs (do this after EVERY nav/action)
 $B click e7                       # act by ref from the latest snapshot …
 $B fill e3 "search text"          # … fill an input by ref

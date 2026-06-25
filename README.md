@@ -333,8 +333,8 @@ Adding a service, by case:
    Already baked in: **`yt-dlp`** (youtube), **`gh`** (github-pages),
    **`sonos`** (sonos — compiled from source in a
    multi-stage build, since upstream ships macOS binaries only), and **`@playwright/cli` +
-   headless Chrome** (browser). Most are tiny and
-   harmless if unused; **Chrome is the one heavy add (~hundreds of MB)** — the cost of the
+   headless WebKit** (browser). Most are tiny and
+   harmless if unused; **WebKit is the one heavy add (~hundreds of MB)** — the cost of the
    `browser` skill. They're all installed regardless to keep setup simple.
 
 Declare dependencies in `SKILL.md` frontmatter (OpenClaw-compatible):
