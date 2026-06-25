@@ -112,7 +112,7 @@ whatever `data/pi/settings.json` selects (no `--model` flag needed).
 ```bash
 docker exec core_harness pi --list-models                                     # which models are configured?
 # Core loads four small extensions, one dedicated concern each, via repeated -e:
-EXTS="-e /app/.pi/extensions/spill.mjs -e /app/.pi/extensions/loop-guard.mjs -e /app/.pi/extensions/tool-call-guard.mjs -e /app/.pi/extensions/memory.mjs"
+EXTS="-e /app/.pi/extensions/spill-to-file.mjs -e /app/.pi/extensions/loop-guard.mjs -e /app/.pi/extensions/tool-call-guard.mjs -e /app/.pi/extensions/memory.mjs"
 docker exec -it core_harness pi $EXTS                                          # uses settings.json default
 docker exec core_harness pi -p "/skill:process-inbox" $EXTS
 ```
@@ -154,9 +154,8 @@ in `skills/` (mounted to pi's config dir). Current skills:
 | `docs` | Google Docs — create a doc, read its text, append text. Confirms before writing. |
 | `youtube` | Video transcripts (summarize any video) + your subscriptions & new-videos feed. |
 | `weather` | Current conditions + forecast via Open-Meteo (no API key). |
-| `transit` | German public-transport / Deutsche Bahn connections, departures, delays & platforms via the free transport.rest DB API (no key). |
 | `overpass` | Find amenities/POIs near a place from OpenStreetMap ("pharmacies near X", ATMs/supermarkets/playgrounds nearby, opening hours) — geocodes via Nominatim + queries the free Overpass API (no key). Returns coordinates; pair with `google-maps` to visualize. |
-| `google-maps` | Turn coordinates/places into a Google Maps link (one place, no key) or a Static Maps image with pins (several places + an optional highlighted spot; needs a Maps Platform key). Composable — Core uses it to visualize results from e.g. `overpass`. |
+| `google-maps` | Turn coordinates/places into a Google Maps link (one place, no key) or a Static Maps image with pins (several places + an optional highlighted spot; needs a Maps Platform key). Also **directions + travel time between two places** — driving/walking/cycling and **public transport** (trains, S-/U-Bahn, trams, buses; departure/arrival + line-by-line route) via the Directions API. Composable — Core uses it to visualize results from e.g. `overpass`. |
 | `websearch` | Web search via the private SearXNG instance. |
 | `web-read` | Fetch a URL and extract its main readable text (to summarize/answer from). |
 | `browser` | Drive a fresh headless browser — open/click/fill/navigate via accessibility-ref snapshots (Playwright CLI). For interaction; sandboxed, logged-out. |
@@ -210,7 +209,7 @@ subagents**, then collects and synthesizes the results — you only ever talk to
 provided by the [`@tintinweb/pi-subagents`](https://www.npmjs.com/package/@tintinweb/pi-subagents)
 pi extension (a Claude Code-style `Agent` tool), installed by `setup.sh` (pinned).
 
-Unlike the bundled `extensions/` (loaded explicitly with `-e`, e.g. spill/memory), this is an
+Unlike the bundled `extensions/` (loaded explicitly with `-e`, e.g. spill-to-file/memory), this is an
 installed **pi package**: `setup.sh` runs `pi install` once, which registers it in
 `data/pi/settings.json` so pi **auto-loads it on every run** — CLI and scheduled jobs alike.
 No launcher flags needed. To (re)install by hand:
@@ -250,7 +249,7 @@ already in context — no re-asking, no stale assumptions.
 
 To keep the model's context lean over long sessions:
 
-- **Spill-to-file** (`data/pi/extensions/spill.mjs`) — big JSON tool output (search results, the
+- **Spill-to-file** (`data/pi/extensions/spill-to-file.mjs`) — big JSON tool output (search results, the
   subscriptions feed, …) is written to a file and replaced with a compact preview + path; the
   model queries it with `jq`. Deterministic, free, no extra model call.
 - **Compaction** — handled natively by pi (`settings.compaction`): when the conversation grows

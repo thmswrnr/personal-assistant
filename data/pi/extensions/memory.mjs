@@ -6,7 +6,7 @@
 // index is tiny by design; full fact files live under `storage/memory/` and the agent reads
 // only the ones whose description looks relevant — same progressive disclosure as skills.
 //
-// One dedicated concern, loaded via its own `-e` on every Core entry point. See also [[spill]],
+// One dedicated concern, loaded via its own `-e` on every Core entry point. See also [[spill-to-file]],
 // [[loop-guard]], [[compaction]].
 import { readFileSync } from "node:fs";
 

@@ -6,7 +6,7 @@
 // so the model breaks out. Append (not replace) → harmless on a false positive. State is
 // per-process, so it resets every run.
 //
-// One dedicated concern, loaded via its own `-e` on every Core entry point. See also [[spill]],
+// One dedicated concern, loaded via its own `-e` on every Core entry point. See also [[spill-to-file]],
 // [[memory]], [[compaction]].
 
 const LOOP_THRESHOLD = 4; // identical consecutive calls before we intervene

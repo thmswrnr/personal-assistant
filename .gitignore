@@ -41,7 +41,7 @@ data/pi/*
 # Track our own extension source, but not any runtime files pi drops in extensions/
 !data/pi/extensions/
 data/pi/extensions/*
-!data/pi/extensions/spill.mjs
+!data/pi/extensions/spill-to-file.mjs
 !data/pi/extensions/loop-guard.mjs
 !data/pi/extensions/tool-call-guard.mjs
 !data/pi/extensions/memory.mjs

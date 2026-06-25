@@ -30,7 +30,7 @@ CONTAINER="core_harness"
 # explicitly with its own -e (the arg parser accepts repeated -e). Compaction is left to pi's
 # native mechanism (it tracks file-ops in the summary, which a custom hook would discard).
 EXT_DIR="/app/.pi/extensions"
-EXT_ARGS=(-e "$EXT_DIR/spill.mjs" -e "$EXT_DIR/loop-guard.mjs" -e "$EXT_DIR/tool-call-guard.mjs" -e "$EXT_DIR/memory.mjs")
+EXT_ARGS=(-e "$EXT_DIR/spill-to-file.mjs" -e "$EXT_DIR/loop-guard.mjs" -e "$EXT_DIR/tool-call-guard.mjs" -e "$EXT_DIR/memory.mjs")
 
 # Allocate a TTY only when we actually have one (so piped/non-interactive use still works).
 if [ -t 0 ] && [ -t 1 ]; then TTY=(-it); else TTY=(-i); fi

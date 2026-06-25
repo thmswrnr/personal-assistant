@@ -30,7 +30,7 @@ const MODEL = process.env.CORE_MODEL ?? "";
 // memory). Loaded with one -e apiece (pi's arg parser accepts repeated -e). Compaction stays
 // native to pi.
 const EXT_DIR = "/app/.pi/extensions";
-const EXT_ARGS = ["spill", "loop-guard", "tool-call-guard", "memory"].flatMap((n) => ["-e", `${EXT_DIR}/${n}.mjs`]);
+const EXT_ARGS = ["spill-to-file", "loop-guard", "tool-call-guard", "memory"].flatMap((n) => ["-e", `${EXT_DIR}/${n}.mjs`]);
 const FILE = process.env.SCHEDULE_FILE ?? "/app/storage/schedule.json";
 const log = (...a) => console.log("[scheduler]", ...a);
 

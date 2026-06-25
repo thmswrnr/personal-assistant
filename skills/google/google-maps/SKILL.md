@@ -39,8 +39,9 @@ $M directions "50.7320,7.0968" "Londoner Straße 4, Bonn" --mode driving   # def
   `duration` (traffic-aware for driving), and for `--mode transit` the `departure`/`arrival`
   times and the line-by-line `steps`; plus a `mapLink` to open the route. Modes: `driving`
   (default), `walking`, `bicycling`, `transit`. Summarize it in a sentence; offer the `mapLink`.
-  For German rail specifically, the `transit` skill (Deutsche Bahn) has richer train detail —
-  use `directions --mode transit` for general/door-to-door routing and quick ETAs.
+  `--mode transit` covers German public transport too — long-distance/regional trains,
+  S-Bahn/U-Bahn, trams and buses, door-to-door — with departure/arrival times and the
+  line-by-line route. This is Core's public-transport/connections capability.
 
 ## Notes
 - `staticmap` needs a **Google Maps Platform** API key (this is *not* the Workspace OAuth token —

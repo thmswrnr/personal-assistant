@@ -10,7 +10,7 @@
 // so it resets every run.
 //
 // One dedicated concern, loaded via its own `-e` on every Core entry point. See also
-// [[loop-guard]], [[spill]], [[memory]].
+// [[loop-guard]], [[spill-to-file]], [[memory]].
 
 const MAX_NUDGES = 2; // corrective retries before we tell the model to give up cleanly
 
