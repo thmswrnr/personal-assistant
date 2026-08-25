@@ -17,6 +17,11 @@ services:
       - ./core/scheduler:/app/scheduler:ro
     env_file:
       - .env
+    # Reach a model server running on the HOST (e.g. the local-llama repo on :8080). Linux
+    # doesn't provide host.docker.internal by default; host-gateway maps it to the bridge
+    # gateway. Harmless when you only use a hosted API.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     environment:
       # Use the mounted .pi dir as pi's config dir (models.json, SYSTEM.md, skills/).
       # The model is an external OpenAI-compatible API configured in data/pi/models.json +

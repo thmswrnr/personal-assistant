@@ -21,7 +21,12 @@ cd "$(dirname "$0")"
 # MODELS (optional): comma-separated patterns offered for in-session Ctrl+P cycling — BARE
 # model ids/globs (e.g. "comma-soft/*"). Leave empty to skip. Switching mid-session also moves
 # inherit-type subagents.
-MODELS=""
+#
+# Below: the hosted comma-soft models plus everything the local llama.cpp server offers (see
+# the `local` provider in data/pi/models.json). Ctrl+P cycles between them. Picking a local one
+# needs that server up — pi does not fall back to the hosted API if it's down, and the first
+# call to a cold local model waits for it to load.
+MODELS="comma-soft/*,gemma-4-12b-it-Q5_K_M,gpt-oss-20b-Q8_0,Qwen3-Coder-30B-A3B-Instruct-Q4_K_M,Qwen3.5-4B-Q6_K"
 MODELS_ARG=()
 [ -n "$MODELS" ] && MODELS_ARG=(--models "$MODELS")
 CONTAINER="core_harness"
