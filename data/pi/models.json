@@ -8,7 +8,7 @@
   // "openai-completions" is the OpenAI chat-completions wire format — spoken by Alan, OpenAI,
   // Groq, OpenRouter, Together, vLLM, LM Studio, llama.cpp, and most others. apiKey supports
   // $ENV interpolation ($LLM_API_KEY here); baseUrl is a literal string. If you self-host a
-  // model (e.g. examples/local-models/), set baseUrl to its host:port and any LLM_API_KEY value
+  // model (llama.cpp, vLLM, LM Studio, …), set baseUrl to its host:port and any LLM_API_KEY value
   // (a local server ignores it). For pi's BUILT-IN providers (anthropic/openai/gemini, etc.)
   // you don't need an entry here at all — set their standard key env var and reference the model
   // as "<provider>/<id>" in settings.json.

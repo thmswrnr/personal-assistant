@@ -6,7 +6,7 @@ machine. It reads and organizes your documents, keeps a "second brain," reaches 
 connect (Gmail, Drive, Calendar, YouTube, the web), runs recurring jobs on a schedule, and can
 ping you on Telegram (one-way, via the `notify` skill) — all running on your own box. The harness is tiny, so it's happy on a
 Raspberry Pi talking to a hosted API; if you'd rather self-host the model, point it at a local
-server instead (see [`examples/local-models/`](examples/local-models/)).
+server instead.
 
 ---
 
@@ -14,8 +14,8 @@ server instead (see [`examples/local-models/`](examples/local-models/)).
 
 - Docker + Docker Compose
 - An **OpenAI-compatible LLM endpoint** + API key. Any will do — a hosted provider, or a model
-  you self-host (see [`examples/local-models/`](examples/local-models/)). For solid tool-calling
-  + thinking, use a capable instruct model.
+  you self-host (llama.cpp, vLLM, LM Studio, …). For solid tool-calling + thinking, use a
+  capable instruct model.
 - No GPU required for Core itself (only if you choose to self-host the model).
 
 ---
@@ -27,8 +27,8 @@ This is the whole model setup. Core talks to one **generic OpenAI-compatible pro
 `api` in `data/pi/models.json`):
 
 1. **Endpoint** — `data/pi/models.json` → the `api` provider's `baseUrl` (e.g.
-   `https://api.your-provider/v1`). Self-hosting? Run
-   [`examples/local-models/`](examples/local-models/) and point `baseUrl` at it.
+   `https://api.your-provider/v1`). Self-hosting? Run your own OpenAI-compatible server and
+   point `baseUrl` at it.
 2. **Key** — `.env` → `LLM_API_KEY=…` (kept out of version control; a self-hosted server
    ignores it).
 3. **Model id** — list it under the `api` provider's `models[]`, and set
@@ -52,8 +52,7 @@ docker compose up -d --build       # builds + starts core + searxng (no local mo
 
 Optional integrations: **Google** (Gmail/Drive/Calendar/YouTube, plus a Maps Platform key for
 static maps & directions in `google-maps`) — see "Integrating external services"; **Telegram
-notifications** — see the `notify` skill; **self-hosted model** —
-[`examples/local-models/`](examples/local-models/).
+notifications** — see the `notify` skill.
 
 > `./setup.sh` automates the common path (`.env`, SearXNG secret, optional integrations, build
 > & start) and is idempotent.
@@ -85,7 +84,6 @@ flag needed). Stop: `docker compose down`.
 | `data/pi/` | `/app/.pi` | pi config: `models.json`, `SYSTEM.md`, `extensions/`, plus pi runtime (`sessions/`, …) |
 | `data/storage/` | `/app/storage` | your files: `inbox/`, `artefacts/` (the second brain), `archived/`, `projects/` (per-project `plan.md` + `todos.md`), `schedule.json`, `memory/` (long-term facts), `custom_skills/` (Core's own writable skills — see `skill-builder`). The main to-do list lives in Google Tasks, not here. |
 | `data/secrets/` | `/app/secrets` | OAuth creds / tokens (git-ignored) |
-| `data/models/` | — | GGUF files, only if you self-host via `examples/local-models/` (unused by Core's stack) |
 | `skills/` | `/app/.pi/skills` | `SKILL.md` capability packages (version-controlled) |
 | `core/` | — | the core image (`Dockerfile`) + its runtime script (`scheduler/`) |
 | `searxng/` | `/etc/searxng` (in `searxng`) | SearXNG config |
@@ -375,6 +373,7 @@ docker exec core_harness pi -p "hi"
 - **pi built-in provider** (openai / anthropic / gemini / …) — skip the `api` entry entirely:
   set that provider's standard key in `.env` (e.g. `OPENAI_API_KEY`) and put `"<provider>/<id>"`
   in `settings.json` `defaultModel`. Confirm exact names with `pi --list-models`.
-- **Self-hosting** — run [`examples/local-models/`](examples/local-models/) (a standalone
-  llama.cpp server), point the `api` provider's `baseUrl` at it, and set `defaultModel` to its
-  alias. Same three values; only the endpoint is yours.
+- **Self-hosting** — run your own OpenAI-compatible server (llama.cpp, vLLM, LM Studio, …),
+  point the `api` provider's `baseUrl` at it, and set `defaultModel` to the id it reports.
+  Same three values; only the endpoint is yours. Core does not ship a model server — keep it
+  in its own repo so several projects can share one.

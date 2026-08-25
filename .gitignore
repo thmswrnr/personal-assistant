@@ -22,10 +22,6 @@ npm-debug.log*
 __pycache__/
 *.pyc
 
-# Large model weights — keep the folder, ignore the files
-data/models/*
-!data/models/.gitkeep
-
 # User files & secrets — keep the folders, ignore the contents
 data/storage/*
 !data/storage/.gitkeep

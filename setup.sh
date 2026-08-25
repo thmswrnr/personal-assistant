@@ -51,10 +51,10 @@ elif command -v docker-compose >/dev/null 2>&1; then DC="docker-compose"
 else warn "Docker Compose not found — install it first."; exit 1; fi
 ok "docker + compose present"
 if docker info 2>/dev/null | grep -qi nvidia || command -v nvidia-smi >/dev/null 2>&1; then
-  ok "NVIDIA GPU runtime detected (only needed if you self-host the model)"
+  ok "NVIDIA GPU runtime detected (only needed if you run a model server yourself)"
 else
   info "No NVIDIA GPU runtime — fine. Core talks to an external API; a GPU is only needed if you"
-  info "choose to self-host the model (see examples/local-models/)."
+  info "run a model server yourself."
 fi
 
 # ── 2. .env ─────────────────────────────────────────────────────────────────────────
@@ -71,7 +71,7 @@ else set_env SEARXNG_SECRET "$(openssl rand -hex 32)"; ok "generated SEARXNG_SEC
 bold "4/6  Model API key (LLM_API_KEY)"
 info "Core talks to an OpenAI-compatible API. The endpoint + model live in data/pi/models.json"
 info "(the 'api' provider) and data/pi/settings.json; only the KEY goes here."
-info "Self-hosting instead? Any value works (a local server ignores it) — see step 5."
+info "Self-hosting instead? Any value works (a local server ignores it)."
 if grep -qE '^LLM_API_KEY=.+' .env; then ok "LLM_API_KEY already set"
 else
   k="$(askval "Your model API key" secret)"
@@ -116,17 +116,6 @@ if yesno "Comma-Soft Alan skill (ask the Alan assistant)?"; then
     printf '%s\n' "$a" > data/secrets/alan_api_key
     ok "Alan key saved (data/secrets/alan_api_key)"
   else warn "no key — Alan skill left off"; fi
-fi
-
-# Self-hosting the model (optional) — download the GGUF for examples/local-models/.
-if yesno "Self-host the model locally (downloads ~8GB GGUF for examples/local-models/)?"; then
-  for m in "unsloth/gemma-4-12b-it-GGUF gemma-4-12b-it-Q5_K_M.gguf" \
-           "unsloth/gemma-4-12b-it-GGUF mmproj-BF16.gguf"; do
-    f="data/models/$(echo "$m" | awk '{print $2}')"
-    [ -f "$f" ] && ok "have $(basename "$f")" || scripts/download-model.sh $m
-  done
-  info "Start it:  cd examples/local-models && docker compose up -d"
-  info "Then point the 'api' provider baseUrl in data/pi/models.json at it (see its README)."
 fi
 
 # ── 6. Build & start ──────────────────────────────────────────────────────────────────
