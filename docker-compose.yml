@@ -1,6 +1,6 @@
 services:
   core:
-    build: 
+    build:
       context: ./core
       dockerfile: Dockerfile
     container_name: core_harness
