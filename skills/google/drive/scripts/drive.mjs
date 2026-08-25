@@ -11,12 +11,18 @@
 //   node drive.mjs list ["<name contains>"] [maxResults]
 //   node drive.mjs search "<full-text query>" [maxResults]
 //   node drive.mjs read <fileId>
+//   node drive.mjs write <localPath> [--name "<name>"] [--folder "<folderName>"] [--mime "<type>"]
 //   node drive.mjs inbox-list                 (debug: what's in the Drive __inbox__ folder)
 //   node drive.mjs inbox-watch                (scheduler poller — see cmdInboxWatch)
 //
+// `write` uploads a local file (e.g. a generated artefact from /app/storage or /tmp) to Drive.
+// --folder targets any folder by name and creates it if missing; without --folder the file
+// lands in My Drive root. The script has no built-in default folder — a user's preferred dump
+// location (if any) is their convention, kept in Core's memory, not hardcoded here.
+//
 // Auth: reads the refresh token from the shared Google token file, mints a
 // short-lived access token, and calls the API. The token never enters the model's context.
-import { writeFileSync, mkdirSync, existsSync, rmSync } from "node:fs";
+import { writeFileSync, readFileSync, mkdirSync, existsSync, rmSync } from "node:fs";
 import { accessToken } from "../../_shared/google-auth.mjs";
 const DRIVE = "https://www.googleapis.com/drive/v3";
 
@@ -229,6 +235,101 @@ async function cmdInboxWatch(token) {
   process.exit(1);
 }
 
+// ---- write: upload a local file to Drive (interactive; create-only) ----
+
+// POST JSON to the Drive API (create a folder, etc.). Returns the parsed body.
+async function apiPost(url, token, body) {
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) die(`API failed: ${res.status} ${await res.text()}`);
+  return res.json();
+}
+
+// Resolve a folder by name → id, creating it (optionally under a parent) if it doesn't exist.
+async function findOrCreateFolder(token, name, parentId) {
+  const existing = await findFolder(token, name);
+  if (existing) return { id: existing, created: false };
+  const body = {
+    name,
+    mimeType: "application/vnd.google-apps.folder",
+    ...(parentId ? { parents: [parentId] } : {}),
+  };
+  const f = await apiPost(`${DRIVE}/files?fields=id`, token, body);
+  return { id: f.id, created: true };
+}
+
+const MIME_BY_EXT = {
+  md: "text/markdown", txt: "text/plain", csv: "text/csv", json: "application/json",
+  html: "text/html", xml: "text/xml", yaml: "text/yaml", yml: "text/yaml",
+  pdf: "application/pdf", png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", gif: "image/gif",
+};
+const mimeForName = (name) => MIME_BY_EXT[(name.split(".").pop() ?? "").toLowerCase()] ?? "application/octet-stream";
+
+// Multipart upload: one request carrying both the file metadata (name/parent/mimeType) and the
+// bytes. Returns the created file's {id, name, webViewLink, parents}.
+async function uploadFile(token, { name, parentId, mimeType, data }) {
+  const boundary = "core-" + Math.random().toString(36).slice(2);
+  const meta = { name, ...(parentId ? { parents: [parentId] } : {}), mimeType };
+  const head =
+    `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(meta)}\r\n` +
+    `--${boundary}\r\nContent-Type: ${mimeType}\r\n\r\n`;
+  const tail = `\r\n--${boundary}--`;
+  const body = Buffer.concat([Buffer.from(head, "utf8"), data, Buffer.from(tail, "utf8")]);
+  const res = await fetch(
+    "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,webViewLink,parents",
+    {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": `multipart/related; boundary=${boundary}` },
+      body,
+    },
+  );
+  if (!res.ok) die(`upload failed: ${res.status} ${await res.text()}`);
+  return res.json();
+}
+
+// Tiny flag parser for `write` (the read commands stay positional). Returns { _: [...], <flag>: val }.
+function parseFlags(args) {
+  const out = { _: [] };
+  for (let i = 0; i < args.length; i++) {
+    const a = args[i];
+    if (a.startsWith("--")) {
+      const next = args[i + 1];
+      if (next === undefined || next.startsWith("--")) out[a.slice(2)] = true;
+      else out[a.slice(2)] = args[++i];
+    }
+    else out._.push(a);
+  }
+  return out;
+}
+
+async function cmdWrite(token, rest) {
+  const f = parseFlags(rest);
+  const localPath = f._[0];
+  if (!localPath) die('usage: drive.mjs write <localPath> [--name "<name>"] [--folder "<folderName>"] [--mime "<type>"]');
+  let data;
+  try { data = readFileSync(localPath); }
+  catch (e) { die(`can't read ${localPath}: ${e.message}`); }
+
+  const name = f.name && f.name !== true ? f.name : (localPath.split("/").pop() || "drive-file");
+  const mimeType = f.mime && f.mime !== true ? f.mime : mimeForName(name);
+
+  let parentId = null;
+  let folderLabel = "My Drive";
+  let created = false;
+  if (f.folder && f.folder !== true) {
+    const r = await findOrCreateFolder(token, f.folder);
+    parentId = r.id;
+    folderLabel = f.folder;
+    created = r.created;
+  }
+
+  const up = await uploadFile(token, { name, parentId, mimeType, data });
+  return { uploaded: up.name, folder: folderLabel, folderCreated: created || undefined, mimeType, id: up.id, link: up.webViewLink };
+}
+
 const clampMax = (v, def = 20, cap = 50) => Math.min(parseInt(v ?? String(def), 10) || def, cap);
 
 const [cmd, ...rest] = process.argv.slice(2);
@@ -248,6 +349,9 @@ switch (cmd) {
     result = await cmdRead(token, rest[0]);
     break;
   }
+  case "write":
+    result = await cmdWrite(token, rest);
+    break;
   case "inbox-list": {
     const folderId = await findFolder(token, INBOX_FOLDER_NAME);
     result = folderId
@@ -259,6 +363,6 @@ switch (cmd) {
     await cmdInboxWatch(token); // exits the process itself (poller; never prints a result)
     break;
   default:
-    die('unknown command. use: list ["<name>"] [n] | search "<query>" [n] | read <fileId> | inbox-list | inbox-watch');
+    die('unknown command. use: list ["<name>"] [n] | search "<query>" [n] | read <fileId> | write <localPath> [--name] [--folder] [--mime] | inbox-list | inbox-watch');
 }
 console.log(JSON.stringify(result, null, 2));

@@ -1,6 +1,6 @@
 ---
 name: drive
-description: Read the user's Google Drive (cloud storage) — list and search files/folders and read the text of Google Docs, Sheets, and plain-text files. Use for "find my … doc in Drive", "what's in my Drive", "read the … spreadsheet", "search my files for …". Read-only. (Google Drive cloud — distinct from the local files inbox folder.)
+description: Access the user's Google Drive (cloud storage) — list and search files/folders, read the text of Google Docs/Sheets/text files, and write (upload) a file to Drive. Use for "find my … doc in Drive", "what's in my Drive", "read the … spreadsheet", "search my files for …", and "save/dump/put this in (my) Drive / the … folder". Reads anything; writes by uploading new files (never deletes or overwrites). (Google Drive cloud — distinct from the local files inbox folder.)
 metadata:
   {
     "core":
@@ -11,10 +11,10 @@ metadata:
 # Google Drive
 
 Access the user's Google Drive via a small CLI that calls the official Drive API.
-For your use it is **read-only** — `list`, `search`, and `read` only. Never create,
-edit, move, or delete Drive files, even though the OAuth token now permits it: the
-write capability exists solely for the automated `inbox-watch` poller (run by the
-scheduler, not by you — see below). Treat Drive as read-only.
+You may **read** freely (`list`, `search`, `read`) and **write by uploading new files**
+(`write`). You must **never delete, trash, move, or overwrite** existing Drive files —
+`write` only ever *creates* a new file. (The token's trash capability is used solely by the
+automated `inbox-watch` poller — the scheduler, not you. See below.)
 
 ## Commands (run via bash)
 
@@ -28,6 +28,10 @@ node /app/.pi/skills/google/drive/scripts/drive.mjs search "quarterly report" 20
 
 # Read a file's text (use an id from list/search)
 node /app/.pi/skills/google/drive/scripts/drive.mjs read <fileId>
+
+# Write (upload) a local file to Drive — e.g. dump a generated artefact
+node /app/.pi/skills/google/drive/scripts/drive.mjs write /app/storage/artefacts/report.md
+node /app/.pi/skills/google/drive/scripts/drive.mjs write /tmp/out.csv --name "Q3 figures.csv" --folder "Reports"
 ```
 
 Each command prints JSON.
@@ -36,6 +40,27 @@ Each command prints JSON.
 - `read` returns `{id, name, mimeType, content}` for Google Docs (→ plain text),
   Sheets (→ CSV), and text files. For binary files (PDF, images, etc.) it returns
   `{…, note}` explaining it can't extract text — share the `link` instead.
+- `write` returns `{uploaded, folder, id, link}` (plus `folderCreated: true` if it had to
+  make the folder). Report the `folder` and `link` back to the user.
+
+## Writing to Drive
+
+`write <localPath>` uploads an existing local file (an artefact in `/app/storage`, or scratch
+in `/tmp`) as a **new** Drive file. Typical flow when the user says "dump/save this to Drive":
+produce the file locally first (e.g. with the `write` tool into `/app/storage/artefacts/…`),
+then upload it.
+
+- **Which folder?** Pass `--folder "<name>"` to target any folder (matched by name; **created
+  if it doesn't exist**). Without `--folder`, the file lands in **My Drive root**.
+- **No forced default.** This skill has no built-in dump folder. If the user has a preferred
+  default location for "just put it in Drive" (with no folder named), that's their personal
+  convention — **check long-term memory** for it and use `--folder` accordingly. If the user
+  *names* a folder, always honour that over any default.
+- `--name` overrides the Drive file name (defaults to the local basename); `--mime` overrides
+  the content type (otherwise inferred from the extension).
+- **Create only.** Never delete, trash, move, or overwrite existing Drive files. Uploading a
+  same-named file creates a second copy — if the user wants to "update" a file, tell them this
+  creates a new copy rather than silently doing it.
 
 ## How to use it
 
