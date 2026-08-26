@@ -76,21 +76,41 @@ It starts the stack if needed (`docker exec`s into `core_harness`, loading Core'
 extensions via repeated `-e`) and uses the model `data/pi/settings.json` selects (no `--model`
 flag needed). Stop: `docker compose down`.
 
+### Call it from anywhere
+
+Symlink the launcher onto your `PATH` once, and `core` works from any directory — handy when you
+ssh into the box it runs on:
+
+```bash
+sudo ln -s "$(pwd)/core.sh" /usr/local/bin/core
+
+core -p "what's on my calendar?"   # from any directory
+ssh <host> core -p "any new mail?" # and over a non-interactive ssh
+```
+
+A symlink (not a shell alias) is what makes the `ssh` form work — an alias only exists in
+interactive shells. The launcher resolves the link with `readlink -f`, so it always finds the
+repo it lives in.
+
 ---
 
 ## Folder layout
 
 | Host path | In `core` | Purpose |
 |---|---|---|
-| `data/pi/` | `/app/.pi` | pi config: `models.json`, `SYSTEM.md`, `extensions/`, `agents/`, `skills/`, plus pi runtime (`sessions/`, …) |
+| `data/pi/` | `/app/.pi` | pi config: `settings.json`, `models.json`, `SYSTEM.md`, `extensions/`, `agents/`, `skills/`, plus pi runtime (`sessions/`, `npm/`, …) |
 | `data/storage/` | `/app/storage` | your files: `inbox/`, `artefacts/` (the second brain), `archived/`, `projects/` (per-project `plan.md` + `todos.md`), `memory/` (long-term facts), `custom_skills/` (Core's own writable skills — see `skill-builder`). The main to-do list lives in Google Tasks, not here. |
 | `data/secrets/` | `/app/secrets` | OAuth creds / tokens (git-ignored) |
 | `core/` | — | the core image (`Dockerfile`) |
-| `searxng/` | `/etc/searxng` (in `searxng`) | SearXNG config |
+| `config/searxng/` | `/etc/searxng` (in `searxng`) | SearXNG config |
 
-`data/` contents are git-ignored (only the authored config — `models.json`, `SYSTEM.md`, the
-`extensions/` source, `agents/`, and `skills/` — is tracked). Your data, including
-`storage/memory/`, stays local.
+`data/` contents are git-ignored (only the authored config — `settings.json`, `models.json`,
+`SYSTEM.md`, the `extensions/` source, `agents/`, and `skills/` — is tracked). Your data,
+including `storage/memory/`, stays local.
+
+`settings.json` carries the model defaults and the installed-package list, so a clone is
+correctly wired before `setup.sh` runs. pi also rewrites `theme` and `lastChangelogVersion` in
+it, which shows up as occasional working-tree churn — commit or discard as you like.
 
 ---
 
@@ -127,7 +147,6 @@ invoked by `name`, not path. Current skills:
 | `memory` | Save / recall / forget durable facts — and **auto-captures** them at the end of a chat (Core's long-term memory — see below). |
 | `github-pages` | Publish a static site to GitHub Pages (create repo → push → enable Pages). Needs a PAT in `data/secrets/github_token`. |
 | `sonos` | Control a Sonos speaker — play / pause / volume / favorites. Local network; set `SONOS_HOST` (the speaker IP) in `.env`. |
-| `alan` | Ask the **Comma-Soft Alan** assistant (agentic LLM) and continue conversations. Streams the answer; pick a model (instant / thinking / GPT-5.4). Needs an API key in `data/secrets/alan_api_key`. |
 
 **Engineering** (under `data/pi/skills/engineering/`) — generic software-engineering workflows, wired to Core's tools (git/`gh`, Google `tasks`, `memory`, `notify`):
 
@@ -298,7 +317,7 @@ OAuth token. In Google Cloud:
    Sheets, Google Docs, YouTube Data API v3. (A scope only appears in the consent screen's
    picker *after* its API is enabled.)
 2. Create a **Web application** OAuth client, redirect URI `http://localhost:4100/oauth2callback`,
-   and add the scopes (the authoritative list lives in `scripts/google-oauth.mjs`):
+   and add the scopes (the authoritative list lives in `scripts/google-consent.mjs`):
    - `gmail.readonly`, `gmail.compose`, `gmail.modify` (triage: read/unread, label, archive),
      `gmail.send` (send a draft **you** reviewed — never unprompted)
    - `drive` (full: needed to *move* processed files out of the Drive inbox folder)
@@ -311,7 +330,7 @@ OAuth token. In Google Cloud:
 
 Then run on the host:
 ```bash
-node scripts/google-oauth.mjs    # opens a consent URL; approve once
+node scripts/google-consent.mjs    # opens a consent URL; approve once
 ```
 It writes `data/secrets/google_oauth.json` (one refresh token for all scopes) and **reports
 which scopes were granted** — re-run it whenever you add a skill that needs a new scope.

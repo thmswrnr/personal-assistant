@@ -49,7 +49,7 @@ services:
     container_name: core_searxng
     volumes:
       # settings.yml enables the JSON API; the secret comes from SEARXNG_SECRET (.env).
-      - ./searxng:/etc/searxng:rw
+      - ./config/searxng:/etc/searxng:rw
     environment:
       - SEARXNG_SECRET=${SEARXNG_SECRET:?set SEARXNG_SECRET in .env (openssl rand -hex 32)}
       - SEARXNG_BASE_URL=http://searxng:8080/

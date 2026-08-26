@@ -28,20 +28,21 @@ data/storage/*
 data/secrets/*
 !data/secrets/.gitkeep
 
-# pi config dir: ignore everything pi generates at runtime (sessions, auth, settings,
-# trust, downloaded bin/, rolling context) and track ONLY the
-# config we author. Whitelist approach, so new pi runtime files are ignored by default.
+# pi config dir: ignore everything pi generates at runtime (sessions, auth, trust,
+# downloaded bin/, npm/, rolling context) and track ONLY the config we author.
+# Whitelist approach, so new pi runtime files are ignored by default.
 data/pi/*
 !data/pi/models.json
 !data/pi/SYSTEM.md
-# Track our own extension source, but not any runtime files pi drops in extensions/
+# settings.json is authored config, not runtime state: the model defaults, the custom_skills
+# path, and the installed-package list all live here. pi also rewrites `theme` and
+# `lastChangelogVersion` in it, so expect occasional churn on those two keys.
+!data/pi/settings.json
+# Track our own extension source (any .mjs we author), but not runtime files pi drops here.
+# The un-ignore/re-ignore pair on the directory is what lets the *.mjs negation reach inside it.
 !data/pi/extensions/
 data/pi/extensions/*
-!data/pi/extensions/spill-to-file.mjs
-!data/pi/extensions/loop-guard.mjs
-!data/pi/extensions/tool-call-guard.mjs
-!data/pi/extensions/memory.mjs
-!data/pi/extensions/memory-capture.mjs
+!data/pi/extensions/*.mjs
 # Track our custom subagent definitions (they inherit Core's model unless they pin one)
 !data/pi/agents/
 !data/pi/agents/*.md

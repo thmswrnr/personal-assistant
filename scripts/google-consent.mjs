@@ -11,7 +11,7 @@
 //     (Google silently DROPS any requested scope whose API isn't enabled — this script warns
 //     when that happens.)
 //
-// Usage (on the host):  node scripts/google-oauth.mjs
+// Usage (on the host):  node scripts/google-consent.mjs
 //
 // Opens a local listener, prints a consent URL. You approve it in the browser once;
 // Google redirects back here with a code, which we exchange for a refresh token written

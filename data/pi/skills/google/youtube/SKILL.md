@@ -49,4 +49,4 @@ node /app/.pi/skills/google/youtube/scripts/feed.mjs feed 7
 
 - **Don't invent** videos, channels, or content — only report what the commands return.
 - If the account commands error (e.g. missing `youtube.readonly` scope), say so plainly;
-  the user may need to re-run `scripts/google-oauth.mjs`. The transcript command needs no account.
+  the user may need to re-run `scripts/google-consent.mjs`. The transcript command needs no account.

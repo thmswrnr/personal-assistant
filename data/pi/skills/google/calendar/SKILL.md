@@ -62,5 +62,5 @@ event**, pass both `--start` and `--end`. Optional `--desc "…"` adds a descrip
 ## Setup (one time)
 
 Requires `data/secrets/google_oauth.json` with the `calendar.events` scope. If it's missing or
-lacks the scope, run `node scripts/google-oauth.mjs` on the host once (Calendar API enabled in
+lacks the scope, run `node scripts/google-consent.mjs` on the host once (Calendar API enabled in
 the Google Cloud project).

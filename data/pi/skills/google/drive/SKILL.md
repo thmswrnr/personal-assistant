@@ -93,5 +93,5 @@ archive) — `inbox-pull` only moves the files across.
 
 Requires `data/secrets/google_oauth.json` with the full `drive` scope (read **and** write —
 `inbox-pull` trashes the files it has copied). If it's missing or only has `drive.readonly`,
-the user runs `node scripts/google-oauth.mjs` on the host once (with the Drive API enabled
+the user runs `node scripts/google-consent.mjs` on the host once (with the Drive API enabled
 in their Google Cloud project) to re-consent.

@@ -104,41 +104,22 @@ fi
 if yesno "Google suite (Gmail / Drive / Calendar / YouTube)?"; then
   info "Google needs a one-time browser consent that this script can't automate:"
   info "  1. Put your OAuth client JSON at data/secrets/google_client_secret.json"
-  info "  2. Run on the host:  node scripts/google-oauth.mjs   (see README → Google setup)"
-fi
-
-# Comma-Soft Alan *skill* — ask the Alan assistant from inside Core. Reads its key from
-# data/secrets/alan_api_key. This is separate from your model provider (LLM_API_KEY) above —
-# though if Alan IS your model provider, use that same key for LLM_API_KEY.
-if yesno "Comma-Soft Alan skill (ask the Alan assistant)?"; then
-  a="$(askval "Alan API key (Bearer — Alan → user settings → API keys)" secret)"
-  if [ -n "$a" ]; then
-    printf '%s\n' "$a" > data/secrets/alan_api_key
-    ok "Alan key saved (data/secrets/alan_api_key)"
-  else warn "no key — Alan skill left off"; fi
+  info "  2. Run on the host:  node scripts/google-consent.mjs   (see README → Google setup)"
 fi
 
 # ── 6. Build & start ──────────────────────────────────────────────────────────────────
 bold "6/6  Build & start"
 
-# Self-written skills: ensure the writable skills area exists and is loaded by pi.
-# (settings.json + data/storage are gitignored runtime state, so wire them here.)
+# Self-written skills: ensure the writable skills area exists. data/storage is gitignored, so
+# the folder itself must be created per clone; the pi setting that loads it is tracked in
+# data/pi/settings.json.
 mkdir -p data/storage/custom_skills
-SETTINGS=data/pi/settings.json
-if command -v node >/dev/null 2>&1; then
-  node -e 'const fs=require("fs"),f=process.argv[1];let j={};try{j=JSON.parse(fs.readFileSync(f,"utf8"))}catch{}
-j.skills=Array.from(new Set([...(j.skills||[]),"/app/storage/custom_skills"]));
-fs.writeFileSync(f,JSON.stringify(j,null,2)+"\n")' "$SETTINGS" && ok "custom_skills wired into pi settings"
-elif [ ! -f "$SETTINGS" ]; then
-  printf '{\n  "skills": ["/app/storage/custom_skills"]\n}\n' > "$SETTINGS"; ok "custom_skills wired (new settings.json)"
-else
-  grep -q custom_skills "$SETTINGS" || warn "Add \"/app/storage/custom_skills\" to the \"skills\" array in $SETTINGS to enable self-written skills."
-fi
+ok "custom_skills area ready"
 
 # Subagent delegation extension (pinned). Lets Core act as a boss agent that fans independent
-# work out to parallel subagents. It's a pi package, so it installs into the bind-mounted
-# data/pi (settings.json + npm/ — both gitignored runtime state) and pi auto-discovers it on
-# every run; that means it must be (re)installed per clone, here. Idempotent.
+# work out to parallel subagents. data/pi/settings.json already lists the package (it's tracked),
+# but the code itself lands in the gitignored data/pi/npm/ — so a fresh clone still has to
+# download it here. Idempotent.
 SUBAGENTS_PKG="npm:@tintinweb/pi-subagents@0.10.3"
 
 if yesno "Build the image and start the stack now?" y; then
@@ -158,4 +139,5 @@ fi
 bold "Done."
 info "Talk to Core:        ./core.sh         (or ./core.sh --continue to resume)"
 info "Run a skill:         ./core.sh skill morning-briefing"
+info "Call it anywhere:    sudo ln -s \"$(pwd)/core.sh\" /usr/local/bin/core   (then just: core)"
 info "Re-run this script anytime to add an integration — it won't overwrite what's set."

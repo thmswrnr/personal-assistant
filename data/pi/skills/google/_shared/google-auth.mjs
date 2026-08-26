@@ -17,7 +17,7 @@ export async function accessToken() {
     creds = JSON.parse(readFileSync(OAUTH_FILE, "utf8"));
   }
   catch {
-    throw new Error(`could not read credentials at ${OAUTH_FILE} — run scripts/google-oauth.mjs first`);
+    throw new Error(`could not read credentials at ${OAUTH_FILE} — run scripts/google-consent.mjs first`);
   }
   const body = new URLSearchParams({
     grant_type: "refresh_token",

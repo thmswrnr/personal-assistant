@@ -221,13 +221,13 @@ async function cmdInboxPull(token) {
     }
     catch (e) {
       // Downloaded but couldn't clear it from Drive (most likely the token still has only
-      // drive.readonly — re-run scripts/google-oauth.mjs to grant the full `drive` scope).
+      // drive.readonly — re-run scripts/google-consent.mjs to grant the full `drive` scope).
       // Roll the local copy back so it isn't processed now and re-downloaded next time.
       rmSync(r.ok, { force: true });
       skipped.push({
         name: f.name,
         reason: `downloaded but NOT cleared from Drive (${e.message}). Rolled back — grant ` +
-          `write access by re-running scripts/google-oauth.mjs, then run inbox-pull again.`,
+          `write access by re-running scripts/google-consent.mjs, then run inbox-pull again.`,
       });
     }
   }

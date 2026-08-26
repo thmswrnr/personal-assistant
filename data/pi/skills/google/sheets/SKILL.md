@@ -33,4 +33,4 @@ $S update <id> "B2" 42                            # overwrite a cell/range (posi
 - **No delete.** This skill can't delete a spreadsheet (by design — needs broader Drive
   permission). Tell the user to remove files from the Drive UI.
 - If credentials are missing/lack the `spreadsheets` scope, the user runs
-  `scripts/google-oauth.mjs`. Never fabricate cell contents.
+  `scripts/google-consent.mjs`. Never fabricate cell contents.

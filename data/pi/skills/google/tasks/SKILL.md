@@ -79,5 +79,5 @@ then `rm <n> --list "<from>"`.
 
 ## Notes
 - Keep each item short and actionable.
-- If the CLI says credentials are missing, the user needs to run `scripts/google-oauth.mjs`
+- If the CLI says credentials are missing, the user needs to run `scripts/google-consent.mjs`
   (with the `tasks` scope) — don't invent tasks.

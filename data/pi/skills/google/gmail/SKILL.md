@@ -77,5 +77,5 @@ is capped by `maxResults`), so you can tell the user "~N total" without listing 
 
 Requires `data/secrets/google_oauth.json` (the shared Google token — Gmail/Drive/Calendar/
 YouTube) with the `gmail.modify` and `gmail.send` scopes (for `modify` and `send`). If it's
-missing or those scopes aren't granted, the user runs `node scripts/google-oauth.mjs` on the
+missing or those scopes aren't granted, the user runs `node scripts/google-consent.mjs` on the
 host once and re-consents in the browser.

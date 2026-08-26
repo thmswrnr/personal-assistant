@@ -10,10 +10,15 @@
 #   ./core.sh skill process-inbox
 # In an interactive chat, /new starts a fresh session.
 #
+# To call it from anywhere (e.g. after ssh-ing into the box), symlink it onto your PATH once:
+#   sudo ln -s "$(pwd)/core.sh" /usr/local/bin/core
+# Then `core -p "…"` works from any directory, and over `ssh <host> core -p "…"` too.
+#
 # It makes sure the stack is running first. The model is an external API (configured in
 # data/pi/settings.json + data/pi/models.json), so there's no local model to wait for.
 set -euo pipefail
-cd "$(dirname "$0")"
+# readlink -f so this still resolves to the repo when invoked through a PATH symlink.
+cd "$(dirname "$(readlink -f "$0")")"
 
 # Core uses pi's own default model (data/pi/settings.json: defaultProvider/defaultModel), so we
 # pass no --model here — changing the default there is all it takes to switch models.
@@ -22,11 +27,11 @@ cd "$(dirname "$0")"
 # model ids/globs (e.g. "comma-soft/*"). Leave empty to skip. Switching mid-session also moves
 # inherit-type subagents.
 #
-# Below: the hosted comma-soft models plus everything the local llama.cpp server offers (see
-# the `local` provider in data/pi/models.json). Ctrl+P cycles between them. Picking a local one
-# needs that server up — pi does not fall back to the hosted API if it's down, and the first
-# call to a cold local model waits for it to load.
-MODELS="comma-soft/*,gemma-4-12b-it-Q5_K_M,gpt-oss-20b-Q8_0,Qwen3-Coder-30B-A3B-Instruct-Q4_K_M,Qwen3.5-4B-Q6_K"
+# Below: every model the hosted `api` provider serves (comma-soft + the GPTs) plus everything the
+# local llama.cpp server offers (see the `local` provider in data/pi/models.json). Ctrl+P cycles
+# between them. Picking a local one needs that server up — pi does not fall back to the hosted API
+# if it's down, and the first call to a cold local model waits for it to load.
+MODELS="comma-soft/*,openai/gpt-5.2,openai/gpt-5.4,gemma-4-12b-it-Q5_K_M,gpt-oss-20b-Q8_0,Qwen3-Coder-30B-A3B-Instruct-Q4_K_M,Qwen3.5-4B-Q6_K"
 MODELS_ARG=()
 [ -n "$MODELS" ] && MODELS_ARG=(--models "$MODELS")
 CONTAINER="core_harness"

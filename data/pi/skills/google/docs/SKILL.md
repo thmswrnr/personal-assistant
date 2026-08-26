@@ -31,4 +31,4 @@ A new paragraph added at the end."                            # append text at t
 - **No delete**, and no in-place editing of existing text beyond appending (by design — keeps
   it safe). Deleting/restructuring is done in the Docs UI.
 - If credentials are missing/lack the `documents` scope, the user runs
-  `scripts/google-oauth.mjs`. Never fabricate document contents.
+  `scripts/google-consent.mjs`. Never fabricate document contents.

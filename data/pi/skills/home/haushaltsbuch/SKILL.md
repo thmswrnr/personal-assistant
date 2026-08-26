@@ -86,4 +86,4 @@ re-show the breakdown. A correction touches one item, not the whole trip.
   or delete existing rows (the skill can't, by design — the user does that in Sheets).
 - Use the **current year's** book: build `haushaltsbuch<year>` from the injected date and pick the
   exact-name match from `find`.
-- If credentials are missing or lack the `spreadsheets` scope, the user runs `scripts/google-oauth.mjs`.
+- If credentials are missing or lack the `spreadsheets` scope, the user runs `scripts/google-consent.mjs`.
