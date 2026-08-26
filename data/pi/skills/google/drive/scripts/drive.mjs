@@ -2,10 +2,10 @@
 // Google Drive CLI for Core. Uses the official Drive v3 API with the shared Google OAuth
 // refresh token. No third-party deps (Node built-in fetch).
 //
-// Interactive commands are READ-ONLY — list/search files and read the text of Docs, Sheets,
-// and text files. The only WRITE action is the automated `inbox-watch` poller (run by the
-// scheduler, never by the model): it ingests new files from a Drive __inbox__ folder into the
-// local inbox and trashes the Drive originals so the folder stays clear.
+// Most commands are READ-ONLY — list/search files and read the text of Docs, Sheets, and text
+// files. The WRITE actions are `write` (upload a local file) and `inbox-pull`: it ingests files
+// from a Drive __inbox__ folder into the local inbox and trashes the Drive originals so the
+// folder stays clear.
 //
 // Commands:
 //   node drive.mjs list ["<name contains>"] [maxResults]
@@ -13,7 +13,7 @@
 //   node drive.mjs read <fileId>
 //   node drive.mjs write <localPath> [--name "<name>"] [--folder "<folderName>"] [--mime "<type>"]
 //   node drive.mjs inbox-list                 (debug: what's in the Drive __inbox__ folder)
-//   node drive.mjs inbox-watch                (scheduler poller — see cmdInboxWatch)
+//   node drive.mjs inbox-pull                 (pull the Drive __inbox__ into the local inbox)
 //
 // `write` uploads a local file (e.g. a generated artefact from /app/storage or /tmp) to Drive.
 // --folder targets any folder by name and creates it if missing; without --folder the file
@@ -26,8 +26,8 @@ import { writeFileSync, readFileSync, mkdirSync, existsSync, rmSync } from "node
 import { accessToken } from "../../_shared/google-auth.mjs";
 const DRIVE = "https://www.googleapis.com/drive/v3";
 
-// Drive __inbox__ ingest: which Drive folder to watch, and where to drop downloaded files
-// locally (the existing `process-inbox` skill + its scheduler watch take it from there).
+// Drive __inbox__ ingest: which Drive folder to pull from, and where to drop downloaded files
+// locally (the `process-inbox` skill takes it from there).
 const INBOX_FOLDER_NAME = process.env.DRIVE_INBOX_FOLDER ?? "__inbox__";
 const LOCAL_INBOX = process.env.CORE_INBOX_DIR ?? "/app/storage/inbox";
 
@@ -193,23 +193,25 @@ async function downloadToInbox(token, meta) {
   return { ok: dest };
 }
 
-// Scheduler poller. Pulls every new file from the Drive __inbox__ folder into the local inbox,
-// then trashes the Drive original so the folder clears. PDFs are ignored for now (no PDF
-// processing yet) and left in place. Always exits 1: the existing local "Inbox" scheduler entry
-// does the actual processing (artefacts/todos/archive) — this only ingests + clears Drive.
-async function cmdInboxWatch(token) {
+// Pulls every file from the Drive __inbox__ folder into the local inbox, then trashes the Drive
+// original so the folder clears. PDFs are ignored for now (no PDF processing yet) and left in
+// place. This only ingests + clears Drive; the `process-inbox` skill does the actual processing
+// (artefacts/todos/archive) afterwards. Returns a summary — an empty folder is a normal result,
+// not an error.
+async function cmdInboxPull(token) {
   const folderId = await findFolder(token, INBOX_FOLDER_NAME);
-  if (!folderId) process.exit(1); // no __inbox__ folder → nothing to do
+  if (!folderId) return { folder: INBOX_FOLDER_NAME, note: "folder not found in Drive", ingested: [] };
 
   // Ignore PDFs until we have a way to read them — leave them sitting in the Drive folder.
   const targets = (await listChildren(token, folderId)).filter((f) => f.mimeType !== "application/pdf");
-  if (targets.length === 0) process.exit(1);
+  if (targets.length === 0) return { folder: INBOX_FOLDER_NAME, ingested: [] };
 
   const ingested = [];
+  const skipped = [];
   for (const f of targets) {
     const r = await downloadToInbox(token, f);
     if (!r.ok) {
-      console.error(`drive inbox-watch: skip "${f.name}" — ${r.skip}`);
+      skipped.push({ name: f.name, reason: r.skip });
       continue;
     }
 
@@ -220,19 +222,17 @@ async function cmdInboxWatch(token) {
     catch (e) {
       // Downloaded but couldn't clear it from Drive (most likely the token still has only
       // drive.readonly — re-run scripts/google-oauth.mjs to grant the full `drive` scope).
-      // Roll the local copy back so it isn't processed now and re-downloaded every tick.
+      // Roll the local copy back so it isn't processed now and re-downloaded next time.
       rmSync(r.ok, { force: true });
-      console.error(
-        `drive inbox-watch: "${f.name}" downloaded but NOT cleared from Drive (${e.message}). ` +
-        `Rolled back — grant write access by re-running scripts/google-oauth.mjs, then it retries.`,
-      );
+      skipped.push({
+        name: f.name,
+        reason: `downloaded but NOT cleared from Drive (${e.message}). Rolled back — grant ` +
+          `write access by re-running scripts/google-oauth.mjs, then run inbox-pull again.`,
+      });
     }
   }
 
-  if (ingested.length) {
-    console.error(`drive inbox-watch: ingested + cleared ${ingested.length} file(s): ${ingested.join(", ")}`);
-  }
-  process.exit(1);
+  return { folder: INBOX_FOLDER_NAME, localInbox: LOCAL_INBOX, ingested, ...(skipped.length ? { skipped } : {}) };
 }
 
 // ---- write: upload a local file to Drive (interactive; create-only) ----
@@ -359,10 +359,10 @@ switch (cmd) {
       : { folder: INBOX_FOLDER_NAME, note: "folder not found in Drive" };
     break;
   }
-  case "inbox-watch":
-    await cmdInboxWatch(token); // exits the process itself (poller; never prints a result)
+  case "inbox-pull":
+    result = await cmdInboxPull(token);
     break;
   default:
-    die('unknown command. use: list ["<name>"] [n] | search "<query>" [n] | read <fileId> | write <localPath> [--name] [--folder] [--mime] | inbox-list | inbox-watch');
+    die('unknown command. use: list ["<name>"] [n] | search "<query>" [n] | read <fileId> | write <localPath> [--name] [--folder] [--mime] | inbox-list | inbox-pull');
 }
 console.log(JSON.stringify(result, null, 2));

@@ -47,25 +47,13 @@ Sending real email is **two deliberate steps**, never one:
 1. Create the message with `draft` and show the user the full draft (to, subject, body).
 2. **Only after the user explicitly approves THAT draft** (e.g. "yes, send it"), run
    `send <draftId>` with the id returned by `draft`. Never call `send` off your own
-   judgement, never compose-and-send in one move, and never send during a scheduled/
-   automated run. If the user hasn't clearly said to send, leave it as a draft.
+   judgement and never compose-and-send in one move. If the user hasn't clearly said to
+   send, leave it as a draft.
 
 ## Modifying labels (mark read / archive)
 
 `modify` changes the user's real mailbox. Run it **only when the user explicitly asks**
-("mark these read", "archive that"). The Gmail watcher does **not** mark anything read on
-its own — it only summarizes and notifies. (A future opt-in triage rule may auto-archive
-obvious junk, but that's not active yet.)
-
-### `watch` — for the scheduler, not for chat
-
-`gmail.mjs watch` is a non-interactive poller used as a scheduler `watch` gate (see the
-`schedule` skill), **not** something to run when chatting. It checks for new **unread
-inbox** mail since it last ran (cursor in `/app/storage/state/gmail-watch.json`), exits
-`0` only when something new appeared, and stages those messages to
-`/app/storage/state/gmail-pending.json`. On a `0` exit the scheduler fires a Core run whose
-prompt reads that pending file and summarizes/notifies. First run primes silently (records
-the current unread backlog without firing).
+("mark these read", "archive that"). Reading or summarizing mail never changes it.
 
 Each command prints JSON. `search` returns
 `{query, estimatedTotal, returned, messages: [{id, from, subject, date, snippet}]}` —

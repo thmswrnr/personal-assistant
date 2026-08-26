@@ -11,9 +11,9 @@ metadata:
 # Memory (long-term)
 
 Core's memory is a folder of small fact files under `storage/memory/`, plus an auto-generated
-`MEMORY.md` index that is loaded into **every** run (interactive, scheduled, and Telegram).
-That means a fact saved here is available to all future runs — including stateless ones like a
-scheduled notification — without anyone having to re-explain it.
+`MEMORY.md` index that is loaded into **every** run (interactive and one-shot alike).
+That means a fact saved here is available to all future runs — including stateless one-shots —
+without anyone having to re-explain it.
 
 The index lists each fact's description. When a description looks relevant to the current
 request, **read that fact's file** (`storage/memory/<slug>.md`) for the full detail before

@@ -1,6 +1,6 @@
 // Long-term memory injection for Core.
 //
-// Core runs are stateless (one-shot `pi` per command, scheduled job, or Telegram message),
+// Core runs are stateless (a fresh one-shot `pi` per command),
 // so durable facts must be *present* in every run rather than read on a hunch. This module
 // appends the memory INDEX (one line per fact) to the system prompt on every prompt. The
 // index is tiny by design; full fact files live under `storage/memory/` and the agent reads

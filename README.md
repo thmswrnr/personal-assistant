@@ -3,8 +3,9 @@
 Core is a self-hosted assistant: the [**pi**](https://github.com/earendil-works/pi) agent
 harness in Docker, driving **any OpenAI-compatible LLM**, sharing a set of folders on your
 machine. It reads and organizes your documents, keeps a "second brain," reaches services you
-connect (Gmail, Drive, Calendar, YouTube, the web), runs recurring jobs on a schedule, and can
-ping you on Telegram (one-way, via the `notify` skill) — all running on your own box. The harness is tiny, so it's happy on a
+connect (Gmail, Drive, Calendar, YouTube, the web), and can ping you on Telegram (one-way, via
+the `notify` skill) — all running on your own box. It does nothing on its own: it acts only when
+you ask it to. The harness is tiny, so it's happy on a
 Raspberry Pi talking to a hosted API; if you'd rather self-host the model, point it at a local
 server instead.
 
@@ -82,9 +83,9 @@ flag needed). Stop: `docker compose down`.
 | Host path | In `core` | Purpose |
 |---|---|---|
 | `data/pi/` | `/app/.pi` | pi config: `models.json`, `SYSTEM.md`, `extensions/`, `agents/`, `skills/`, plus pi runtime (`sessions/`, …) |
-| `data/storage/` | `/app/storage` | your files: `inbox/`, `artefacts/` (the second brain), `archived/`, `projects/` (per-project `plan.md` + `todos.md`), `schedule.json`, `memory/` (long-term facts), `custom_skills/` (Core's own writable skills — see `skill-builder`). The main to-do list lives in Google Tasks, not here. |
+| `data/storage/` | `/app/storage` | your files: `inbox/`, `artefacts/` (the second brain), `archived/`, `projects/` (per-project `plan.md` + `todos.md`), `memory/` (long-term facts), `custom_skills/` (Core's own writable skills — see `skill-builder`). The main to-do list lives in Google Tasks, not here. |
 | `data/secrets/` | `/app/secrets` | OAuth creds / tokens (git-ignored) |
-| `core/` | — | the core image (`Dockerfile`) + its runtime script (`scheduler/`) |
+| `core/` | — | the core image (`Dockerfile`) |
 | `searxng/` | `/etc/searxng` (in `searxng`) | SearXNG config |
 
 `data/` contents are git-ignored (only the authored config — `models.json`, `SYSTEM.md`, the
@@ -117,7 +118,6 @@ invoked by `name`, not path. Current skills:
 | `web-read` | Fetch a URL and extract its main readable text (to summarize/answer from). |
 | `browser` | Drive a fresh headless browser — open/click/fill/navigate via accessibility-ref snapshots (Playwright CLI). For interaction; sandboxed, logged-out. |
 | `notify` | Send *you* a Telegram message (hard-limited to your chat). |
-| `schedule` | Manage recurring jobs (list / add / remove cron jobs). |
 | `process-inbox` | Read each file in `inbox/` (incl. **images** via vision) → note + todos → archive. |
 | `morning-briefing` | Dated greeting + unread email + today's calendar + weather + a joke. |
 | `tasks` | Multi-list task manager backed by **Google Tasks** (syncs to the Google Tasks app + Gmail/Calendar side panel) — routes by intent across your lists (Todo, Einkaufsliste/shopping, Inbox/capture); add / list / complete, due dates. |
@@ -168,7 +168,7 @@ pi extension (a Claude Code-style `Agent` tool), installed by `setup.sh` (pinned
 
 Unlike the bundled `extensions/` (loaded explicitly with `-e`, e.g. spill-to-file/memory), this is an
 installed **pi package**: `setup.sh` runs `pi install` once, which registers it in
-`data/pi/settings.json` so pi **auto-loads it on every run** — CLI and scheduled jobs alike.
+`data/pi/settings.json` so pi **auto-loads it on every run** — interactive and one-shot alike.
 No launcher flags needed. To (re)install by hand:
 
 ```bash
@@ -185,8 +185,7 @@ pin its own (e.g. a faster/cheaper id for the lightweight `fetch`/`Explore` work
 
 ## Memory (long-term)
 
-Core runs are **stateless** — every command and scheduled job is a fresh `pi`
-process. Long-term memory is how durable facts survive that: they're recorded as small files
+Core runs are **stateless** — every command is a fresh `pi` process. Long-term memory is how durable facts survive that: they're recorded as small files
 under `data/storage/memory/` (one fact per file), with an auto-generated `MEMORY.md` **index**.
 
 - The `memory.mjs` extension (loaded via its own `-e` on every entry point) injects the index
@@ -199,11 +198,11 @@ under `data/storage/memory/` (one fact per file), with an auto-generated `MEMORY
   session it runs a one-shot extraction pass (a fast Alan model, no tools, in a sub-process that
   can't recurse) over the conversation and *silently* saves any durable personal facts through
   the same store — deduped against the index and gated to skip one-offs/ephemeral details.
-  Stateless one-shot / scheduled runs don't trigger it. Pruning stale facts stays a manual task
+  Stateless one-shot runs don't trigger it. Pruning stale facts stays a manual task
   (`memory forget`).
 
-The payoff: a scheduled `notify` or a one-off command runs with your preferences and key facts
-already in context — no re-asking, no stale assumptions.
+The payoff: every command runs with your preferences and key facts already in context — no
+re-asking, no stale assumptions.
 
 ---
 
@@ -226,60 +225,25 @@ To keep the model's context lean over long sessions:
 
 ---
 
-## Scheduling
+## Always on (no timers)
 
-The `core` container runs a **scheduler** as its main process — it fires recurring jobs at set
-times, with no dependency on anything external.
+Core never acts on its own — there is no scheduler and nothing runs on a clock. It does exactly
+what you ask, when you ask it.
 
-**Just ask Core** — it manages the schedule via the `schedule` skill:
+It is still **always reachable**. The `core` container's main process is a keep-alive, so the
+container stays open as a warm shell that `core.sh` enters with `docker exec`; both services use
+`restart: unless-stopped`, so the stack comes back after a reboot or a crash. That is what makes
+a Raspberry Pi you ssh into at any hour a good home for it.
 
-> "Every morning at 7, run my briefing and save it as an email draft."
-> "What's scheduled?" · "Stop the hourly email job."
-
-Each job is a standard **cron** expression + a Core **prompt**, stored in
-`data/storage/schedule.json` (reloaded live). What happens with the result is up to the prompt
-— save an email draft, append to a note, `notify` you, etc. Output is also logged to
-`docker logs core_harness`.
-
-```json
-[
-  { "label": "Morning briefing", "cron": "0 7 * * *",
-    "prompt": "Run the morning briefing and save it as a Gmail draft to myself." },
-  { "label": "Weekday standup",  "cron": "30 8 * * 1-5",
-    "prompt": "List today's calendar events and append them to a 'standup' note." }
-]
-```
-
-cron = `minute hour day-of-month month day-of-week` (local time; set via `TZ` on the `core`
-service, default `Europe/Berlin`). E.g. `0 7 * * *` daily 07:00, `30 8 * * 1-5` weekdays 08:30,
-`0 * * * *` hourly, `*/15 * * * *` every 15 min. See `core/scheduler/schedule.example.json`.
-
-### Watch-gated jobs (event-driven)
-
-Add an optional **`watch`** — a cheap shell command used as a **gate** — to turn a timed job into
-an event-driven one. With `watch` present, `cron` is just the *check cadence*: on each tick the
-watch runs (deterministic, no LLM, outside the job queue) and the `prompt` fires **only if the
-watch exits 0**. That's how file-watching and service-polling fit — the watch is the cheap "did
-anything change?" test, the prompt is the (expensive) reaction.
-
-```json
-[
-  { "label": "Inbox", "cron": "*/2 * * * *",
-    "watch": "ls /app/storage/inbox | grep -q .",
-    "prompt": "/skill:process-inbox" }
-]
-```
-
-Make the watch **edge-triggered** so it doesn't re-fire every tick — either self-clearing (the
-reaction removes the condition, e.g. `process-inbox` empties the inbox) or cursor-based (the
-script records what it last saw and exits 0 only on something newer).
+> Want something to happen at a set time? Use your OS. A `cron` entry or a systemd timer on the
+> host that runs `./core.sh -p "…"` or `./core.sh skill morning-briefing` gives you the same
+> result, with the scheduling owned by the machine rather than by Core.
 
 ---
 
 ## Telegram notifications (optional)
 
-Core can ping you on Telegram via the `notify` skill (and scheduled jobs, e.g. the morning
-briefing). This is **outbound-only** — there is no interactive bot. **Optional** — Core runs
+Core can ping you on Telegram via the `notify` skill. This is **outbound-only** — there is no interactive bot. **Optional** — Core runs
 fine without it.
 
 1. Create a bot with **@BotFather**, put the token in `.env` as `TELEGRAM_BOT_TOKEN`.

@@ -1,6 +1,6 @@
 ---
 name: notify
-description: Send the user a notification/message — or a file — on their phone via Telegram. Use when asked to "notify me", "send me a message/reminder", "ping me when…", "send me the file/document/image", or to deliver a result (text or a generated file) to the user (e.g. from a scheduled task). Goes ONLY to the user's own Telegram chat.
+description: Send the user a notification/message — or a file — on their phone via Telegram. Use when asked to "notify me", "send me a message/reminder", "ping me when…", "send me the file/document/image", or to deliver a result (text or a generated file) to the user (e.g. at the end of a long job they walked away from). Goes ONLY to the user's own Telegram chat.
 metadata:
   {
     "core":
@@ -40,8 +40,8 @@ Plain text with no tags is fine too.
 
 ## How to use it
 
-1. Use it when the user asks to be notified/reminded, or to deliver the result of a task
-   they won't be watching (e.g. a scheduled morning briefing). Keep messages concise.
+1. Use it when the user asks to be notified/reminded, or to deliver the result of a job
+   they walked away from and won't be watching. Keep messages concise.
    When the user wants an actual **file** (a generated doc, an image, an export), use
    `send-file.mjs` instead of pasting the contents into a message.
 2. It's the delivery channel for proactive updates — pair it with other skills (e.g.

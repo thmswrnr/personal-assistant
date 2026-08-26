@@ -14,8 +14,6 @@ services:
       # The skills already arrive with the .pi mount above. Re-mount them read-only so the
       # agent cannot edit its own tracked skill packages (it writes to storage/custom_skills).
       - ./data/pi/skills:/app/.pi/skills:ro
-      # Scheduler script (its main process; see command: below)
-      - ./core/scheduler:/app/scheduler:ro
     env_file:
       - .env
     # Reach a model server running on the HOST (e.g. the local-llama repo on :8080). Linux
@@ -28,14 +26,18 @@ services:
       # The model is an external OpenAI-compatible API configured in data/pi/models.json +
       # data/pi/settings.json (key via LLM_API_KEY in .env) — no local model service required.
       - PI_CODING_AGENT_DIR=/app/.pi
-      # Local timezone so scheduled "07:00" jobs fire at local time. Change as needed.
+      # Local timezone, so dates and times Core reports are local. Change as needed.
       - TZ=Europe/Berlin
       # Sonos speaker IP for the `sonos` skill (set SONOS_HOST in .env). The bot gets this via
-      # its env_file; the scheduler/interactive core need it listed here.
+      # its env_file; interactive core needs it listed here.
       - SONOS_HOST=${SONOS_HOST:-}
-    # Run the scheduler as the main process: it keeps the container alive AND fires
-    # scheduled jobs. Interactive use (`core.sh` → docker exec pi) runs alongside it.
-    command: ["node", "/app/scheduler/scheduler.mjs"]
+    # Core does nothing on its own — it acts only when asked. So the main process is just a
+    # keep-alive: it holds the container open as a warm shell that `core.sh` (and any future
+    # service on this box) enters with `docker exec pi …`.
+    command: ["sleep", "infinity"]
+    # Come back after a reboot or a crash — Core is meant to be reachable 24/7. "unless-stopped"
+    # (not "always") so a deliberate `docker compose stop` stays stopped.
+    restart: unless-stopped
     networks:
       - core_network
 
@@ -51,6 +53,7 @@ services:
     environment:
       - SEARXNG_SECRET=${SEARXNG_SECRET:?set SEARXNG_SECRET in .env (openssl rand -hex 32)}
       - SEARXNG_BASE_URL=http://searxng:8080/
+    restart: unless-stopped
     networks:
       - core_network
 

@@ -1,6 +1,6 @@
 ---
 name: tasks
-description: Manage the user's task lists in Google Tasks — a multi-list task manager, not one flat to-do list. Use when the user wants to add/see/complete/delete a task or reminder ("remind me to…", "add a todo…", incl. timed ones like "…in an hour"), put something on a specific list (e.g. a shopping list — "we need milk", "auf die Einkaufsliste"), create a new list, or import a list of items. The user's own lists and where things go are personal conventions — check long-term memory for them. For work CORE itself runs on a timer (briefings, recurring checks), use `schedule` instead.
+description: Manage the user's task lists in Google Tasks — a multi-list task manager, not one flat to-do list. Use when the user wants to add/see/complete/delete a task or reminder ("remind me to…", "add a todo…", incl. timed ones like "…in an hour"), put something on a specific list (e.g. a shopping list — "we need milk", "auf die Einkaufsliste"), create a new list, or import a list of items. The user's own lists and where things go are personal conventions — check long-term memory for them.
 metadata:
   { "core": { "requires": { "bins": ["node"], "files": ["/app/secrets/google_oauth.json"] } } }
 ---
@@ -28,10 +28,10 @@ token.
   (e.g. `process-inbox`) should target a dedicated capture list per the user's convention, never
   their main list.
 
-> **Reminders go here, not on the cron.** "Remind me to <do something myself>" is a to-do for
-> the user → a task, *even if it names a time* ("…in an hour", "…tomorrow"). Google Tasks tracks
-> a `--due` **date** (not a clock time). Only use the `schedule` skill when the user wants
-> **Core** to run work at a time.
+> **Every reminder is a task.** "Remind me to <do something myself>" is a to-do for the user →
+> a task, *even if it names a time* ("…in an hour", "…tomorrow"). Google Tasks tracks a `--due`
+> **date** (not a clock time), and it syncs to their phone, which is where the reminder is
+> actually useful. Core does not run anything on a timer.
 >
 > **Project tasks go elsewhere.** Tasks tied to a specific project live in that project's own
 > `storage/projects/<slug>/todos.md` (see `project-planning`) — not in Google Tasks.

@@ -19,7 +19,7 @@
 // no-ops. Everything is best-effort — a failure or timeout must never block session shutdown.
 //
 // One dedicated concern, loaded via its own `-e` on every Core entry point. Only does work in
-// interactive sessions; one-shot/scheduled runs are `--no-session` and below the message gate.
+// interactive sessions; one-shot `-p` runs are `--no-session` and below the message gate.
 // See also [[memory]] (injection), [[spill-to-file]], [[loop-guard]], [[tool-call-guard]].
 
 import { spawn } from "node:child_process";

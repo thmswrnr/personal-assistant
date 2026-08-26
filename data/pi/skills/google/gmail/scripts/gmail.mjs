@@ -6,23 +6,13 @@
 //   node gmail.mjs labels
 //   node gmail.mjs search "<gmail query>" [maxResults]
 //   node gmail.mjs read <messageId>
-//   node gmail.mjs watch                 (scheduler poller — see cmdWatch)
 //
 // Auth: reads the refresh token from $GOOGLE_OAUTH_FILE (default
 // /app/secrets/google_oauth.json), mints a short-lived access token, and calls
 // the API. The token never appears in the agent's context.
 import { accessToken } from "../../_shared/google-auth.mjs";
-import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 
 const API = "https://gmail.googleapis.com/gmail/v1/users/me";
-
-// Cursor-based watch state lives on the writable storage volume (survives restarts).
-const STATE_DIR = process.env.GMAIL_STATE_DIR ?? "/app/storage/state";
-const WATCH_FILE = `${STATE_DIR}/gmail-watch.json`;
-const PENDING_FILE = `${STATE_DIR}/gmail-pending.json`;
-// Unread mail in the inbox (newest first, capped at 25 in the query below). No category filter:
-// this account doesn't use Gmail's tabs, so `category:primary` would match nothing.
-const WATCH_QUERY = "is:unread in:inbox";
 
 function die(msg) {
   console.error(`gmail: ${msg}`);
@@ -166,7 +156,7 @@ async function cmdSend(token, draftId) {
 }
 
 // Change a message's labels — mark read/unread, archive, star, or raw label ids. Requires
-// the gmail.modify scope. Run ONLY when the user explicitly asks (the watcher never does).
+// the gmail.modify scope. Run ONLY when the user explicitly asks.
 async function cmdModify(token, id, f) {
   const add = [];
   const remove = [];
@@ -204,88 +194,6 @@ async function cmdRead(token, id) {
       return b.length > 6000 ? b.slice(0, 6000) + "\n…[truncated]" : b;
     })(),
   };
-}
-
-// Non-interactive poller for the scheduler, run every few minutes as a plain shell command.
-// Cursor-based + edge-triggered: it announces only mail it hasn't announced before. When new
-// unread mail appears it sends the Telegram notification ITSELF (deterministic — see
-// notifyNewMail), so delivery never depends on a model executing tools, then exits 1 so the
-// scheduler does NOT also fire its (now-unused) LLM prompt. Exit code contract:
-//   exit 1  → always (nothing new, first-run priming, or "new mail found AND notified").
-//   exit 0  → never used now; the watch is self-contained.
-// Cursor = the set of unread ids already announced; read mail drops out of the query on its
-// own, so the set stays bounded and self-pruning. The query is capped at 25 (newest first).
-async function cmdWatch(token) {
-  mkdirSync(STATE_DIR, { recursive: true });
-
-  const list = await api(`/messages?q=${encodeURIComponent(WATCH_QUERY)}&maxResults=25`, token);
-  const currentIds = (list.messages ?? []).map((m) => m.id);
-
-  let seenIds;
-  try {
-    seenIds = JSON.parse(readFileSync(WATCH_FILE, "utf8")).seenIds ?? [];
-  }
-  catch {
-    // First run ever (no cursor file): prime silently so we don't announce the whole
-    // existing unread backlog. Record what's there now and don't fire.
-    writeFileSync(WATCH_FILE, JSON.stringify({ seenIds: currentIds }, null, 2));
-    process.exit(1);
-  }
-
-  const seen = new Set(seenIds);
-  const newIds = currentIds.filter((id) => !seen.has(id));
-
-  // Advance the cursor to the current unread set every run, regardless of outcome.
-  writeFileSync(WATCH_FILE, JSON.stringify({ seenIds: currentIds }, null, 2));
-
-  if (newIds.length === 0) process.exit(1);
-
-  // Fetch lightweight metadata for the new messages only and stage them for the prompt.
-  const messages = await Promise.all(
-    newIds.map(async (id) => {
-      const m = await api(
-        `/messages/${id}?format=metadata&metadataHeaders=From&metadataHeaders=Subject&metadataHeaders=Date`,
-        token,
-      );
-      return {
-        id,
-        from: header(m.payload?.headers, "From"),
-        subject: header(m.payload?.headers, "Subject"),
-        date: header(m.payload?.headers, "Date"),
-        snippet: m.snippet ?? "",
-      };
-    }),
-  );
-  writeFileSync(PENDING_FILE, JSON.stringify(messages, null, 2));
-
-  // Notify directly and stop. exit 1 so the scheduler doesn't also run an LLM prompt.
-  await notifyNewMail(messages);
-  process.exit(1);
-}
-
-// Push a Telegram notification about new unread mail — self-contained (same sendMessage as the
-// notify skill) so the watcher never relies on the model executing tools. One consolidated
-// message: sender + subject per item, newest first. HTML with a plain-text retry, length-capped.
-async function notifyNewMail(messages) {
-  const TOKEN = process.env.TELEGRAM_BOT_TOKEN;
-  const CHAT = process.env.TELEGRAM_CHAT_ID;
-  if (!TOKEN || !CHAT) return; // Telegram not configured — nothing to send.
-
-  const esc = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-  const senderName = (from) => (from.match(/^\s*"?([^"<]+?)"?\s*</)?.[1] || from).trim();
-  const lines = messages.map((m) => `• <b>${esc(m.subject || "(no subject)")}</b> — ${esc(senderName(m.from))}`);
-  const text = `📬 ${messages.length} new unread email${messages.length === 1 ? "" : "s"}:\n${lines.join("\n")}`;
-
-  const send = (parseMode) =>
-    fetch(`https://api.telegram.org/bot${TOKEN}/sendMessage`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ chat_id: CHAT, text: text.slice(0, 4000), ...(parseMode ? { parse_mode: parseMode } : {}) }),
-    }).then((r) => r.ok).catch(() => false);
-
-  const ok = (await send("HTML")) || (await send(null));
-  // Log to stderr (the scheduler ignores it for the gate) so delivery is visible in docker logs.
-  console.error(`gmail watch: ${messages.length} new — notification ${ok ? "sent" : "FAILED"}`);
 }
 
 const [cmd, ...rest] = process.argv.slice(2);
@@ -326,11 +234,7 @@ switch (cmd) {
     result = await cmdModify(token, id, parseFlags(rest.slice(1)));
     break;
   }
-  case "watch":
-    // Exits with its own code (0 = fire, 1 = don't); never reaches the JSON print below.
-    await cmdWatch(token);
-    break;
   default:
-    die('unknown command. use: labels | search "<query>" [n] | read <id> | draft --to <a> --subject <s> --body <t> | send <draftId> | modify <id> [--read|--archive|…] | watch');
+    die('unknown command. use: labels | search "<query>" [n] | read <id> | draft --to <a> --subject <s> --body <t> | send <draftId> | modify <id> [--read|--archive|…]');
 }
 console.log(JSON.stringify(result, null, 2));

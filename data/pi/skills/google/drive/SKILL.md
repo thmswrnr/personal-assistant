@@ -13,8 +13,8 @@ metadata:
 Access the user's Google Drive via a small CLI that calls the official Drive API.
 You may **read** freely (`list`, `search`, `read`) and **write by uploading new files**
 (`write`). You must **never delete, trash, move, or overwrite** existing Drive files —
-`write` only ever *creates* a new file. (The token's trash capability is used solely by the
-automated `inbox-watch` poller — the scheduler, not you. See below.)
+`write` only ever *creates* a new file. The one exception is `inbox-pull`, which trashes the
+Drive originals it has already copied into the local inbox. See below.
 
 ## Commands (run via bash)
 
@@ -32,6 +32,10 @@ node /app/.pi/skills/google/drive/scripts/drive.mjs read <fileId>
 # Write (upload) a local file to Drive — e.g. dump a generated artefact
 node /app/.pi/skills/google/drive/scripts/drive.mjs write /app/storage/artefacts/report.md
 node /app/.pi/skills/google/drive/scripts/drive.mjs write /tmp/out.csv --name "Q3 figures.csv" --folder "Reports"
+
+# Pull the Drive __inbox__ folder into the local inbox (see below)
+node /app/.pi/skills/google/drive/scripts/drive.mjs inbox-list
+node /app/.pi/skills/google/drive/scripts/drive.mjs inbox-pull
 ```
 
 Each command prints JSON.
@@ -71,18 +75,23 @@ then upload it.
 3. **Never invent file names or contents.** If a command errors (e.g. missing
    credentials, or the Drive API not enabled), report that plainly instead of guessing.
 
-## Drive `__inbox__` ingest (automated — not for interactive use)
+## Drive `__inbox__` ingest (`inbox-pull`)
 
-A scheduler poller, `drive.mjs inbox-watch`, watches a Drive folder named `__inbox__`.
-Each run it downloads every new **non-PDF** file into the local inbox
-(`/app/storage/inbox/`) — where the `process-inbox` skill then handles it like any other
-dropped file (artefact, todos, archive) — and **trashes** the Drive original so the
-folder stays clear. PDFs are ignored for now and left in place. `inbox-list` prints the
-folder's current contents for debugging. You do not call these — the scheduler does.
+`drive.mjs inbox-pull` empties a Drive folder named `__inbox__` into Core. It downloads every
+**non-PDF** file into the local inbox (`/app/storage/inbox/`) and **trashes** the Drive original
+so the folder stays clear. PDFs are ignored for now and left in place. It prints
+`{folder, localInbox, ingested, skipped?}`; an empty folder gives an empty `ingested` list, which
+is a normal result, not an error.
+
+Run it when the user asks to pull in, fetch, or ingest their Drive inbox ("get the files I put in
+Drive"). Follow it with `/skill:process-inbox` to actually handle what landed (artefact, todos,
+archive) — `inbox-pull` only moves the files across.
+
+`inbox-list` prints the Drive folder's current contents without touching anything.
 
 ## Setup (one time)
 
 Requires `data/secrets/google_oauth.json` with the full `drive` scope (read **and** write —
-the ingest poller trashes processed files). If it's missing or only has `drive.readonly`,
+`inbox-pull` trashes the files it has copied). If it's missing or only has `drive.readonly`,
 the user runs `node scripts/google-oauth.mjs` on the host once (with the Drive API enabled
 in their Google Cloud project) to re-consent.
