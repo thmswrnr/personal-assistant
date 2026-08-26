@@ -29,7 +29,7 @@ data/secrets/*
 !data/secrets/.gitkeep
 
 # pi config dir: ignore everything pi generates at runtime (sessions, auth, settings,
-# trust, downloaded bin/, rolling context, the skills mountpoint) and track ONLY the
+# trust, downloaded bin/, rolling context) and track ONLY the
 # config we author. Whitelist approach, so new pi runtime files are ignored by default.
 data/pi/*
 !data/pi/models.json
@@ -45,3 +45,5 @@ data/pi/extensions/*
 # Track our custom subagent definitions (they inherit Core's model unless they pin one)
 !data/pi/agents/
 !data/pi/agents/*.md
+# Track the skill packages — they are version-controlled source, not runtime state
+!data/pi/skills/

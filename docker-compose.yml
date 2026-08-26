@@ -11,8 +11,9 @@ services:
       - ./data/pi:/app/.pi:rw
       - ./data/storage:/app/storage:rw
       - ./data/secrets:/app/secrets:rw
-      # pi discovers skills under its config dir; mount the tracked skills/ there
-      - ./skills:/app/.pi/skills:ro
+      # The skills already arrive with the .pi mount above. Re-mount them read-only so the
+      # agent cannot edit its own tracked skill packages (it writes to storage/custom_skills).
+      - ./data/pi/skills:/app/.pi/skills:ro
       # Scheduler script (its main process; see command: below)
       - ./core/scheduler:/app/scheduler:ro
     env_file:

@@ -81,15 +81,15 @@ flag needed). Stop: `docker compose down`.
 
 | Host path | In `core` | Purpose |
 |---|---|---|
-| `data/pi/` | `/app/.pi` | pi config: `models.json`, `SYSTEM.md`, `extensions/`, plus pi runtime (`sessions/`, …) |
+| `data/pi/` | `/app/.pi` | pi config: `models.json`, `SYSTEM.md`, `extensions/`, `agents/`, `skills/`, plus pi runtime (`sessions/`, …) |
 | `data/storage/` | `/app/storage` | your files: `inbox/`, `artefacts/` (the second brain), `archived/`, `projects/` (per-project `plan.md` + `todos.md`), `schedule.json`, `memory/` (long-term facts), `custom_skills/` (Core's own writable skills — see `skill-builder`). The main to-do list lives in Google Tasks, not here. |
 | `data/secrets/` | `/app/secrets` | OAuth creds / tokens (git-ignored) |
-| `skills/` | `/app/.pi/skills` | `SKILL.md` capability packages (version-controlled) |
 | `core/` | — | the core image (`Dockerfile`) + its runtime script (`scheduler/`) |
 | `searxng/` | `/etc/searxng` (in `searxng`) | SearXNG config |
 
-`data/` contents are git-ignored (only the authored config — `models.json`, `SYSTEM.md`, and the
-`extensions/` source — is tracked). Your data, including `storage/memory/`, stays local.
+`data/` contents are git-ignored (only the authored config — `models.json`, `SYSTEM.md`, the
+`extensions/` source, `agents/`, and `skills/` — is tracked). Your data, including
+`storage/memory/`, stays local.
 
 ---
 
@@ -98,8 +98,8 @@ flag needed). Stop: `docker compose down`.
 Skills are on-demand capability packages ([Agent Skills standard](https://agentskills.io/specification))
 — a directory with a `SKILL.md` (frontmatter `name` + `description`, then instructions) plus
 optional `scripts/` (executable code), `references/` (on-demand docs), and `assets/` subfolders,
-grouped into category folders under `skills/` (`assistant/`, `google/`, `home/`, `web/`,
-`engineering/`; mounted to pi's config dir). Folders are just for organization — skills are
+grouped into category folders under `data/pi/skills/` (`assistant/`, `google/`, `home/`, `web/`,
+`engineering/`; pi's config dir). Folders are just for organization — skills are
 invoked by `name`, not path. Current skills:
 
 | Skill | What it does |
@@ -129,7 +129,7 @@ invoked by `name`, not path. Current skills:
 | `sonos` | Control a Sonos speaker — play / pause / volume / favorites. Local network; set `SONOS_HOST` (the speaker IP) in `.env`. |
 | `alan` | Ask the **Comma-Soft Alan** assistant (agentic LLM) and continue conversations. Streams the answer; pick a model (instant / thinking / GPT-5.4). Needs an API key in `data/secrets/alan_api_key`. |
 
-**Engineering** (under `skills/engineering/`) — generic software-engineering workflows, wired to Core's tools (git/`gh`, Google `tasks`, `memory`, `notify`):
+**Engineering** (under `data/pi/skills/engineering/`) — generic software-engineering workflows, wired to Core's tools (git/`gh`, Google `tasks`, `memory`, `notify`):
 
 | Skill | What it does |
 |---|---|
@@ -149,7 +149,7 @@ invoked by `name`, not path. Current skills:
 > `SKILL.md` loads on demand. Asked in plain language, a local model may act on the description
 > alone and skip steps — `/skill:<name>` forces the full instructions in.
 
-Add a skill by creating `skills/<category>/<name>/SKILL.md` (+ an optional CLI in `scripts/`) and `docker compose restart core`.
+Add a skill by creating `data/pi/skills/<category>/<name>/SKILL.md` (+ an optional CLI in `scripts/`) and `docker compose restart core`.
 
 ### Vision
 If your model is multimodal, Core can *see* images: drop one in `data/storage/inbox/` and run
