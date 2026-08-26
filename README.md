@@ -321,7 +321,8 @@ OAuth token. In Google Cloud:
    - `gmail.readonly`, `gmail.compose`, `gmail.modify` (triage: read/unread, label, archive),
      `gmail.send` (send a draft **you** reviewed — never unprompted)
    - `drive` (full: needed to *move* processed files out of the Drive inbox folder)
-   - `calendar.events` (read + create/edit/delete events)
+   - `calendar.events` (read + create/edit/delete events), `calendar.readonly` (list your
+     calendars — `calendar.events` alone does not cover that)
    - `youtube.readonly`
    - `tasks` (Google Tasks read/write), `spreadsheets` (Sheets read/write), `documents` (Docs read/write)
 

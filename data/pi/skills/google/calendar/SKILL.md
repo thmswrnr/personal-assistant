@@ -61,6 +61,7 @@ event**, pass both `--start` and `--end`. Optional `--desc "…"` adds a descrip
 
 ## Setup (one time)
 
-Requires `data/secrets/google_oauth.json` with the `calendar.events` scope. If it's missing or
-lacks the scope, run `node scripts/google-consent.mjs` on the host once (Calendar API enabled in
-the Google Cloud project).
+Requires `data/secrets/google_oauth.json` with the `calendar.events` **and**
+`calendar.readonly` scopes — the first covers events, the second is what lets `list` enumerate
+your calendars. If either is missing, run `node scripts/google-consent.mjs` on the host once
+(Calendar API enabled in the Google Cloud project).

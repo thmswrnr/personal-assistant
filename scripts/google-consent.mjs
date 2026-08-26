@@ -41,6 +41,7 @@ const SCOPES = [
   "https://www.googleapis.com/auth/gmail.send",    // send a draft the user reviewed & approved
   "https://www.googleapis.com/auth/drive", // read + write: needed to MOVE processed files out of the Drive __inbox__ folder (drive.file can't touch user-created files, so the full scope is required)
   "https://www.googleapis.com/auth/calendar.events", // read + create/edit/delete calendar events
+  "https://www.googleapis.com/auth/calendar.readonly", // list the user's calendars — calendar.events alone does NOT cover CalendarList.list
   "https://www.googleapis.com/auth/youtube.readonly",
   "https://www.googleapis.com/auth/tasks", // Google Tasks read/write — the general to-do list
   "https://www.googleapis.com/auth/spreadsheets", // Google Sheets read/write
