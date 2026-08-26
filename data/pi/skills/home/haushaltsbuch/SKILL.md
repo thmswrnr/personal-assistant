@@ -80,8 +80,11 @@ re-show the breakdown. A correction touches one item, not the whole trip.
 
 ## Rules
 
-- **Confirm before writing.** Show the rows (date, amount, category, note) and append only once the
-  user is happy — it's their real financial record. Never invent expenses.
+- **Show the rows before appending.** Not permission to act — you already have that — but a
+  check on *your own* work: the user reads off amounts, **you** choose the categories. That
+  classification is yours, so they have to see it before it lands in their financial record.
+  Print the table (date, amount, category, note) and append once they are happy. Never invent
+  expenses.
 - **Append-only, Variable Ausgaben only.** Never write to Übersicht or Kategorien, and never edit
   or delete existing rows (the skill can't, by design — the user does that in Sheets).
 - Use the **current year's** book: build `haushaltsbuch<year>` from the injected date and pick the

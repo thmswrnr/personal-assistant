@@ -46,7 +46,8 @@ inbox one file at a time and leave a clean audit trail.
       line items.) Then it's an **expense** — hand it to the `haushaltsbuch` skill to log it
       (classify items → sum per category → append to Variable Ausgaben). The haushaltsbuch
       row is the record — **don't also write an artefact** (skip step b for it). Archive as usual.
-      Confirm the breakdown with the user before writing to the sheet.
+      Show the classified breakdown before appending — the categories are your work, not the
+      user's (see the `haushaltsbuch` skill).
    d. **Archive** the original with bash: `mv /app/storage/inbox/<file> /app/storage/archived/`.
 3. **Verify before finishing.** Run `ls /app/storage/inbox/` again — it must be empty (every
    file moved to `archived/`). If anything remains, you are not done: go back and finish it.

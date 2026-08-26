@@ -116,8 +116,10 @@ Design scripts for an agent to drive:
 - **Structured output**: print data (JSON) to **stdout**, diagnostics/progress to **stderr**, so
   Core can parse the result cleanly. Keep output bounded (summarise/limit huge results).
 - **Helpful errors**: say what went wrong and what to do next — the message shapes Core's next try.
-- **Be safe**: idempotent where possible, and gate destructive/outward actions behind explicit
-  confirmation (mirror the "confirm before writing" pattern the data skills use).
+- **Be safe**: idempotent where possible. Gate only two things behind confirmation, the way the
+  data skills do — **irreversible removals** and **content the model composed itself**. A plain
+  create/append on a clear request just runs and reports; don't ask permission for the work the
+  user requested.
 
 ## Modifying one of your own skills (already in custom_skills)
 

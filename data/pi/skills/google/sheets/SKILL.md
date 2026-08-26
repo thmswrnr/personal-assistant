@@ -7,9 +7,10 @@ metadata:
 
 # Google Sheets
 
-Read/write the user's Google Sheets via the Sheets v4 API. Reading is free; **writes change a
-real spreadsheet — confirm with the user before appending/updating** (especially `update`,
-which overwrites).
+Read/write the user's Google Sheets via the Sheets v4 API. Reading is free. **`create` and
+`append` act on a clear request — do it, then report which sheet and range you wrote.**
+Confirm first only for **`update`**, which overwrites existing cells and cannot be undone —
+show the range and what is currently there before replacing it.
 
 ```bash
 S="node /app/.pi/skills/google/sheets/scripts/sheets.mjs"

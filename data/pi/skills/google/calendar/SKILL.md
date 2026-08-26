@@ -11,8 +11,8 @@ metadata:
 # Google Calendar
 
 Access and manage the user's Google Calendar via a small CLI that calls the official Calendar
-API. Reading is free to do; **writes (add/edit/rm) change the user's real calendar — confirm
-with the user before making one.**
+API. Reading is free to do. **`add` and `edit` act on a clear request — do it, then report
+what changed.** Only `rm` is confirmed first, because it cannot be undone.
 
 ## Read
 
@@ -28,7 +28,7 @@ Event commands print `{window, events: [{id, summary, start, end, allDay, locati
 `start`/`end` are ISO strings (all-day events use a date and `allDay: true`). The **`id`** is
 what you pass to `edit`/`rm`.
 
-## Write (confirm with the user first)
+## Write
 
 ```bash
 # Create — timed (default duration 1h if --end omitted; default tz Europe/Berlin)
@@ -54,9 +54,12 @@ event**, pass both `--start` and `--end`. Optional `--desc "…"` adds a descrip
    ISO times to a friendly format.
 3. For "am I free at <time>?" reason over the returned events — don't claim availability the
    data doesn't support.
-4. **Before any write**, confirm the specifics with the user (title, date/time, which event for
-   edit/rm) — then run the command and report what changed.
-5. **Never invent events.** If a command errors (missing credentials / API not enabled), report
+4. **`add` / `edit`: act, then report.** "Lunch with Kaj tomorrow at 12" is an instruction —
+   create it and say what you made (title, time, calendar). Ask first only when something is
+   genuinely missing or ambiguous: no date, no clear duration, or two calendars that match.
+5. **`rm`: confirm first.** Name the event you resolved ("deleting 'Zahnarzt', Thu 14:00 — ok?").
+   Deleting is irreversible, and an event picked from an earlier listing may have shifted.
+6. **Never invent events.** If a command errors (missing credentials / API not enabled), report
    it plainly.
 
 ## Setup (one time)

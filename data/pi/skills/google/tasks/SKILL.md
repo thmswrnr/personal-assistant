@@ -47,7 +47,8 @@ node /app/.pi/skills/google/tasks/scripts/tasks.mjs add "Pick up parcel"        
 node /app/.pi/skills/google/tasks/scripts/tasks.mjs add "Call dentist" --due 2026-06-20    # with a due date
 node /app/.pi/skills/google/tasks/scripts/tasks.mjs add "Milch" --list "Einkauf"           # onto a named list (substring)
 ```
-`--due` is `YYYY-MM-DD`. Confirm what you added **and to which list**.
+`--due` is `YYYY-MM-DD`. Just add it, then report what you added **and to which list** — an
+add needs no permission. Ask first only if the target list is genuinely unclear.
 
 ### Bulk import (several items at once)
 Pass multiple titles in one call — they keep their given order. Ideal for turning a checklist
@@ -72,7 +73,11 @@ node /app/.pi/skills/google/tasks/scripts/tasks.mjs done 2 [--list "<name>"]   #
 node /app/.pi/skills/google/tasks/scripts/tasks.mjs rm   2 [--list "<name>"]   # delete task #2 on that list
 ```
 `--list` matches a list by title (substring, case-insensitive). The `n` in `done`/`rm` comes
-from a `list` of **that same list** — always `list` first, then act, then confirm.
+from a `list` of **that same list** — always `list` first, so the number is fresh.
+
+Then, because `n` is a position and not an identity, **say which task you resolved before you
+`done`/`rm` it** ("removing #3 'Call dentist' from Todo — ok?"). A number from an older listing
+can point at a different task now, and `rm` cannot be undone. Adds never need this.
 
 To **move an item between lists**: `list --list "<from>"` to find it, `add` it to the target,
 then `rm <n> --list "<from>"`.

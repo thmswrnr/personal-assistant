@@ -7,7 +7,7 @@
 //   node calendar.mjs agenda [days]              # upcoming events, next N days (default 7)
 //   node calendar.mjs today                      # events for the rest of today
 //   node calendar.mjs search "<query>" [days]    # matching events in the next N days
-// Write (confirm with the user first):
+// Write (add/edit act on a clear request; rm is confirmed first — see SKILL.md):
 //   node calendar.mjs add "<title>" --start <when> [--end <when>] [--location ..] [--desc ..] [--tz <zone>]
 //   node calendar.mjs edit <eventId> [--title ..] [--start ..] [--end ..] [--location ..] [--desc ..]
 //   node calendar.mjs rm <eventId>

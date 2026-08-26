@@ -7,8 +7,10 @@ metadata:
 
 # Google Docs
 
-Read/write the user's Google Docs via the Docs v1 API. Reading is free; **creating or appending
-changes the user's Drive — confirm the gist with the user before writing.**
+Read/write the user's Google Docs via the Docs v1 API. Reading is free. **`create` and
+`append` act on a clear request — do it, then report the document and link.** The exception is
+text *you* composed rather than text the user dictated: show them that before it goes in, since
+they have not seen your wording yet.
 
 ```bash
 D="node /app/.pi/skills/google/docs/scripts/docs.mjs"
