@@ -51,6 +51,12 @@ cp .env.example .env
 docker compose up -d --build       # builds + starts core + searxng (no local model service)
 ```
 
+On a machine that also runs the home-automation side (a Raspberry Pi with a Zigbee stick), add
+the `home` profile to bring up Home Assistant alongside it — set `ZIGBEE_DEVICE` in `.env` first:
+```bash
+docker compose --profile home up -d --build
+```
+
 Optional integrations: **Google** (Gmail/Drive/Calendar/YouTube, plus a Maps Platform key for
 static maps & directions in `google-maps`) — see "Integrating external services"; **Telegram
 notifications** — see the `notify` skill.
@@ -102,6 +108,7 @@ repo it lives in.
 | `data/storage/` | `/app/storage` | your files: `inbox/`, `artefacts/` (the second brain), `archived/`, `projects/` (per-project `plan.md` + `todos.md`), `memory/` (long-term facts), `custom_skills/` (Core's own writable skills — see `skill-builder`). The main to-do list lives in Google Tasks, not here. |
 | `data/secrets/` | `/app/secrets` | OAuth creds / tokens (git-ignored) |
 | `data/searxng/` | `settings.yml` → `/etc/searxng/settings.yml` (in `searxng`) | SearXNG config |
+| `data/homeassistant/` | `/config` (in `homeassistant`) | Home Assistant's config, state and secrets (git-ignored) |
 | `core/` | — | the core image (`Dockerfile`) |
 
 **Everything a container mounts lives under `data/`.** Its contents are git-ignored, apart from

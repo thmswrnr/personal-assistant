@@ -36,6 +36,9 @@ data/secrets/*
 data/searxng/*
 !data/searxng/settings.yml
 
+# Home Assistant's config dir — your home's state, tokens and its own secrets file.
+data/homeassistant/
+
 # pi config dir: ignore everything pi generates at runtime (sessions, auth, trust,
 # downloaded bin/, npm/, rolling context) and track ONLY the config we author.
 # Whitelist approach, so new pi runtime files are ignored by default.

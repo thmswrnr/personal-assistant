@@ -58,6 +58,35 @@ services:
     networks:
       - core_network
 
+  homeassistant:
+    # Home automation. Only starts under the "home" profile, so a dev box without the Zigbee
+    # stick still runs `docker compose up -d` unchanged. On the Pi:
+    #   docker compose --profile home up -d
+    profiles: ["home"]
+    image: ghcr.io/home-assistant/home-assistant:stable
+    container_name: core_homeassistant
+    # Host networking, so HA can discover devices on the LAN (mDNS/SSDP need broadcast traffic,
+    # which a bridge network drops). Side effect: the UI is on the host's :8123 directly, and HA
+    # reaches core_bridge at 127.0.0.1:11434 rather than by container name.
+    network_mode: host
+    # HA manages the radio and mounts/unmounts USB devices; it expects to run privileged.
+    privileged: true
+    volumes:
+      - ./data/homeassistant:/config
+    devices:
+      # The Zigbee stick. Set ZIGBEE_DEVICE in .env to the stable by-id path — NOT /dev/ttyUSB0,
+      # which is assigned in plug order and moves between boots. Find it with:
+      #   ls -l /dev/serial/by-id/
+      # The default is a deliberately non-existent path: compose interpolates every service
+      # before it filters profiles, so a `:?` here would break `docker compose up` on a machine
+      # that never starts this service. Leaving it unset instead fails at container start, with
+      # the missing device's name saying what went wrong.
+      - ${ZIGBEE_DEVICE:-/dev/zigbee-device-not-set-in-env}:/dev/ttyUSB0
+    environment:
+      # Same local timezone as core, so automations and Core agree on what "today" means.
+      - TZ=Europe/Berlin
+    restart: unless-stopped
+
 networks:
   core_network:
     driver: bridge
