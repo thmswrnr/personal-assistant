@@ -109,11 +109,13 @@ services:
       # The Zigbee stick. Set ZIGBEE_DEVICE in .env to the stable by-id path — NOT /dev/ttyUSB0,
       # which is assigned in plug order and moves between boots. Find it with:
       #   ls -l /dev/serial/by-id/
-      # The default is a deliberately non-existent path: compose interpolates every service
-      # before it filters profiles, so a `:?` here would break `docker compose up` on a machine
-      # that never starts this service. Leaving it unset instead fails at container start, with
-      # the missing device's name saying what went wrong.
-      - ${ZIGBEE_DEVICE:-/dev/zigbee-device-not-set-in-env}:/dev/ttyUSB0
+      #
+      # Unset it and this maps /dev/null, so Home Assistant still starts — everything except the
+      # radio works, which is what you want before the stick arrives. ZHA will simply find
+      # nothing on /dev/ttyUSB0 until you point this at the real device and recreate the
+      # container. (Compose interpolates every service before it filters profiles, so a `:?`
+      # here would break `docker compose up` even on a machine that never starts this service.)
+      - ${ZIGBEE_DEVICE:-/dev/null}:/dev/ttyUSB0
     environment:
       # Same local timezone as core, so automations and Core agree on what "today" means.
       - TZ=Europe/Berlin
