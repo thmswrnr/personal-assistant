@@ -91,7 +91,7 @@ with everything else, so:
   order-dependent ("run exactly this command"); stay loose — and explain the *why* — where
   several approaches are fine.
 - **Gotchas are the highest-value content** — concrete, non-obvious environment facts Core would
-  otherwise get wrong (e.g. "Sonos name-discovery fails in the container — always target by IP").
+  otherwise get wrong (e.g. "mDNS discovery fails in the container — always target by IP").
   Keep them in `SKILL.md`. When a real run exposes a mistake, add the correction here.
 - **Keep `SKILL.md` focused** (the spec guideline is < ~500 lines / 5k tokens — every current
   skill is well under). If one genuinely needs a lot of reference material, put it in a sibling

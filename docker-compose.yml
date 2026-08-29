@@ -28,9 +28,6 @@ services:
       - PI_CODING_AGENT_DIR=/app/.pi
       # Local timezone, so dates and times Core reports are local. Change as needed.
       - TZ=Europe/Berlin
-      # Sonos speaker IP for the `sonos` skill (set SONOS_HOST in .env). The bot gets this via
-      # its env_file; interactive core needs it listed here.
-      - SONOS_HOST=${SONOS_HOST:-}
     # Core does nothing on its own — it acts only when asked. So the main process is just a
     # keep-alive: it holds the container open as a warm shell that `core.sh` (and any future
     # service on this box) enters with `docker exec pi …`.

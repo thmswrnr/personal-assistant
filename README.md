@@ -146,7 +146,6 @@ invoked by `name`, not path. Current skills:
 | `skill-builder` | Lets Core author or modify its **own** skills — only on explicit request, shown for approval before writing, into the writable `custom_skills/` area (curated skills stay read-only). |
 | `memory` | Save / recall / forget durable facts — and **auto-captures** them at the end of a chat (Core's long-term memory — see below). |
 | `github-pages` | Publish a static site to GitHub Pages (create repo → push → enable Pages). Needs a PAT in `data/secrets/github_token`. |
-| `sonos` | Control a Sonos speaker — play / pause / volume / favorites. Local network; set `SONOS_HOST` (the speaker IP) in `.env`. |
 
 **Engineering** (under `data/pi/skills/engineering/`) — generic software-engineering workflows, wired to Core's tools (git/`gh`, Google `tasks`, `memory`, `notify`):
 
@@ -293,12 +292,8 @@ Adding a service, by case:
    API, so the token never enters the model's context. Most skills are this case.
 2. **A mature official CLI exists** (e.g. `gh`, `yt-dlp`) → install it in
    **`core/Dockerfile`** (pinned) and rebuild once; the `SKILL.md` documents how to call it.
-   Already baked in: **`yt-dlp`** (youtube), **`gh`** (github-pages),
-   **`sonos`** (sonos — compiled from source in a
-   multi-stage build, since upstream ships macOS binaries only), and **`@playwright/cli` +
-   headless WebKit** (browser). Most are tiny and
-   harmless if unused; **WebKit is the one heavy add (~hundreds of MB)** — the cost of the
-   `browser` skill. They're all installed regardless to keep setup simple.
+   Already baked in: **`yt-dlp`** (youtube) and **`gh`** (github-pages). Both are tiny and
+   harmless if unused, so they're installed regardless to keep setup simple.
 
 Declare dependencies in `SKILL.md` frontmatter (OpenClaw-compatible):
 ```yaml

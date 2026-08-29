@@ -90,11 +90,6 @@ if yesno "Telegram notifications (one-way pings via the notify skill)?"; then
     || warn "no token entered — Telegram left off"
 fi
 
-if yesno "Sonos speaker control?"; then
-  ip="$(askval "Speaker LAN IP (Sonos app → Settings → System → About → IP)")"
-  [ -n "$ip" ] && { set_env SONOS_HOST "$ip"; ok "SONOS_HOST=$ip"; } || warn "no IP — Sonos left off"
-fi
-
 if yesno "GitHub Pages publishing?"; then
   gh="$(askval "GitHub PAT (classic, scope 'repo')" secret)"
   [ -n "$gh" ] && { printf '%s\n' "$gh" > data/secrets/github_token; ok "saved to data/secrets/github_token"; } \

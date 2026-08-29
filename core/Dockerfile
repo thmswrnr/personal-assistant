@@ -1,9 +1,3 @@
-# ---- build sonoscli (Go) — upstream publishes macOS binaries only, so we compile for Linux ----
-# Pinned. Go's toolchain auto-management fetches the exact Go version go.mod asks for.
-FROM golang:1.24-bookworm AS sonosbuild
-ARG SONOSCLI_VERSION=v0.3.2
-RUN GOBIN=/out go install github.com/steipete/sonoscli/cmd/sonos@${SONOSCLI_VERSION}
-
 # ---- main image: Node 22 for the pi harness (pinned for reproducible builds) ----
 FROM node:22.22.3-slim
 
@@ -40,9 +34,6 @@ RUN arch="$(dpkg --print-architecture)" \
     && mv "/tmp/gh_${GH_VERSION}_linux_${arch}/bin/gh" /usr/local/bin/gh \
     && rm -rf "/tmp/gh_${GH_VERSION}_linux_${arch}" \
     && gh --version
-
-# sonoscli (built above) for the sonos skill — controls the soundbar over the LAN (UPnP, port 1400).
-COPY --from=sonosbuild /out/sonos /usr/local/bin/sonos
 
 # Browser automation for the `browser` skill: Playwright CLI (a thin bash front-end —
 # open/snapshot/click-by-ref/…) + headless WebKit. We use WebKit, not Chromium: it's
