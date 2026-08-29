@@ -140,6 +140,7 @@ invoked by `name`, not path. Current skills:
 | `docs` | Google Docs — create a doc, read its text, append text. Confirms before writing. |
 | `youtube` | Video transcripts (summarize any video) + your subscriptions & new-videos feed. |
 | `weather` | Current conditions + forecast via Open-Meteo (no API key). |
+| `home-assistant` | Read and control the home automation — lights, switches, sensors, climate, covers, locks. Local network; needs a long-lived token in `data/secrets/ha_token`. |
 | `overpass` | Find amenities/POIs near a place from OpenStreetMap ("pharmacies near X", ATMs/supermarkets/playgrounds nearby, opening hours) — geocodes via Nominatim + queries the free Overpass API (no key). Returns coordinates; pair with `google-maps` to visualize. |
 | `google-maps` | Turn coordinates/places into a Google Maps link (one place, no key) or a Static Maps image with pins (several places + an optional highlighted spot; needs a Maps Platform key). Also **directions + travel time between two places** — driving/walking/cycling and **public transport** (trains, S-/U-Bahn, trams, buses; departure/arrival + line-by-line route) via the Directions API. Composable — Core uses it to visualize results from e.g. `overpass`. |
 | `websearch` | Web search via the private SearXNG instance. |
