@@ -101,12 +101,13 @@ repo it lives in.
 | `data/pi/` | `/app/.pi` | pi config: `settings.json`, `models.json`, `SYSTEM.md`, `extensions/`, `agents/`, `skills/`, plus pi runtime (`sessions/`, `npm/`, …) |
 | `data/storage/` | `/app/storage` | your files: `inbox/`, `artefacts/` (the second brain), `archived/`, `projects/` (per-project `plan.md` + `todos.md`), `memory/` (long-term facts), `custom_skills/` (Core's own writable skills — see `skill-builder`). The main to-do list lives in Google Tasks, not here. |
 | `data/secrets/` | `/app/secrets` | OAuth creds / tokens (git-ignored) |
+| `data/searxng/` | `settings.yml` → `/etc/searxng/settings.yml` (in `searxng`) | SearXNG config |
 | `core/` | — | the core image (`Dockerfile`) |
-| `config/searxng/` | `/etc/searxng` (in `searxng`) | SearXNG config |
 
-`data/` contents are git-ignored (only the authored config — `settings.json`, `models.json`,
-`SYSTEM.md`, the `extensions/` source, `agents/`, and `skills/` — is tracked). Your data,
-including `storage/memory/`, stays local.
+**Everything a container mounts lives under `data/`.** Its contents are git-ignored, apart from
+the authored config that is whitelisted back in: `settings.json`, `models.json`, `SYSTEM.md`, the
+`extensions/` source, `agents/`, `skills/`, and `searxng/settings.yml`. Your data, including
+`storage/memory/`, stays local.
 
 `settings.json` carries the model defaults and the installed-package list, so a clone is
 correctly wired before `setup.sh` runs. pi also rewrites `theme` and `lastChangelogVersion` in

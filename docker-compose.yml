@@ -50,7 +50,7 @@ services:
       # config dir to its own uid, which then locks the host user out of their own tracked
       # file (a plain `git checkout` of it fails). settings.yml is the only thing SearXNG
       # writes here, and it doesn't need to.
-      - ./config/searxng/settings.yml:/etc/searxng/settings.yml:ro
+      - ./data/searxng/settings.yml:/etc/searxng/settings.yml:ro
     environment:
       - SEARXNG_SECRET=${SEARXNG_SECRET:?set SEARXNG_SECRET in .env (openssl rand -hex 32)}
       - SEARXNG_BASE_URL=http://searxng:8080/

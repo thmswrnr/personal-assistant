@@ -22,11 +22,19 @@ npm-debug.log*
 __pycache__/
 *.pyc
 
+# Everything a container mounts lives under data/. Most of it is runtime state; the few
+# authored files below are whitelisted back in.
+
 # User files & secrets — keep the folders, ignore the contents
 data/storage/*
 !data/storage/.gitkeep
 data/secrets/*
 !data/secrets/.gitkeep
+
+# SearXNG: settings.yml is authored config, nothing else belongs here.
+!data/searxng/
+data/searxng/*
+!data/searxng/settings.yml
 
 # pi config dir: ignore everything pi generates at runtime (sessions, auth, trust,
 # downloaded bin/, npm/, rolling context) and track ONLY the config we author.
