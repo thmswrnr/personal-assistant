@@ -35,23 +35,9 @@ RUN arch="$(dpkg --print-architecture)" \
     && rm -rf "/tmp/gh_${GH_VERSION}_linux_${arch}" \
     && gh --version
 
-# Browser automation for the `browser` skill: Playwright CLI (a thin bash front-end —
-# open/snapshot/click-by-ref/…) + headless WebKit. We use WebKit, not Chromium: it's
-# Playwright's lightest engine, has Linux/arm64 builds (so this builds on the Raspberry Pi), and
-# its build downloads from Playwright's own CDN rather than Google storage — which was timing out
-# for the Chrome-for-Testing build. The skill passes `--browser=webkit`. Install via the CLI's
-# own installer so the browser revision matches the CLI's bundled Playwright. Browsers must be
-# installed at build time (root); the runtime `node` user can't write /ms-playwright, so we make
-# it world-readable for launch.
-ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
-RUN npm install -g @playwright/cli@0.1.14 \
-    && playwright-cli install-browser webkit --with-deps \
-    && chmod -R a+rx /ms-playwright \
-    && rm -rf /var/lib/apt/lists/*
-
 WORKDIR /app
-# The Playwright CLI writes session/snapshot scratch (.playwright-cli/) to the working dir, so
-# /app must be writable by the non-root runtime user.
+# Skills write scratch files to the working dir, so /app must be writable by the non-root
+# runtime user.
 RUN chown node:node /app
 
 # The Pi harness operates in the /app directory

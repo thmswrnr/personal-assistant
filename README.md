@@ -136,7 +136,6 @@ invoked by `name`, not path. Current skills:
 | `google-maps` | Turn coordinates/places into a Google Maps link (one place, no key) or a Static Maps image with pins (several places + an optional highlighted spot; needs a Maps Platform key). Also **directions + travel time between two places** — driving/walking/cycling and **public transport** (trains, S-/U-Bahn, trams, buses; departure/arrival + line-by-line route) via the Directions API. Composable — Core uses it to visualize results from e.g. `overpass`. |
 | `websearch` | Web search via the private SearXNG instance. |
 | `web-read` | Fetch a URL and extract its main readable text (to summarize/answer from). |
-| `browser` | Drive a fresh headless browser — open/click/fill/navigate via accessibility-ref snapshots (Playwright CLI). For interaction; sandboxed, logged-out. |
 | `notify` | Send *you* a Telegram message (hard-limited to your chat). |
 | `process-inbox` | Read each file in `inbox/` (incl. **images** via vision) → note + todos → archive. |
 | `morning-briefing` | Dated greeting + unread email + today's calendar + weather + a joke. |
