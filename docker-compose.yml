@@ -3,6 +3,9 @@ services:
     build:
       context: ./core
       dockerfile: Dockerfile
+    # Named explicitly, and shared with core_bridge below — the two run the same image, and
+    # without a fixed name compose derives one per service and stores the same 900MB twice.
+    image: core-harness
     container_name: core_harness
     # Run as the unprivileged "node" user (uid 1000) so files the agent creates in the
     # mounted volumes are owned by the host user, not root.
@@ -64,6 +67,9 @@ services:
     build:
       context: ./core
       dockerfile: Dockerfile
+    # Same image as core, by name. The build is a cache hit, so this costs nothing and keeps
+    # one copy on disk instead of two.
+    image: core-harness
     container_name: core_bridge
     user: "node"
     volumes:
