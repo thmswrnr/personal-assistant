@@ -58,6 +58,38 @@ services:
     networks:
       - core_network
 
+  core_bridge:
+    # Core, wearing an Ollama server's clothes, so Home Assistant's built-in Ollama conversation
+    # agent can talk to it. Same image as core — it spawns its own `pi --mode rpc` process.
+    build:
+      context: ./core
+      dockerfile: Dockerfile
+    container_name: core_bridge
+    user: "node"
+    volumes:
+      - ./data/pi:/app/.pi:rw
+      - ./data/storage:/app/storage:rw
+      - ./data/secrets:/app/secrets:rw
+      - ./data/pi/skills:/app/.pi/skills:ro
+      # The bridge's own source. Read-only: the agent it runs must not rewrite its own server.
+      - ./bridge:/app/bridge:ro
+    env_file:
+      - .env
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      - PI_CODING_AGENT_DIR=/app/.pi
+      - TZ=Europe/Berlin
+    ports:
+      # Loopback ONLY. This is an unauthenticated endpoint that runs Core's tools — anyone who
+      # can reach it can drive the agent. Home Assistant runs with host networking, so it finds
+      # it at 127.0.0.1:11434 on the same box.
+      - "127.0.0.1:11434:11434"
+    command: ["node", "/app/bridge/server.mjs"]
+    restart: unless-stopped
+    networks:
+      - core_network
+
   homeassistant:
     # Home automation. Only starts under the "home" profile, so a dev box without the Zigbee
     # stick still runs `docker compose up -d` unchanged. On the Pi:

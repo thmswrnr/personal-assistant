@@ -282,6 +282,36 @@ Messages are **locked to your chat id**.
 
 ---
 
+## Talking to Core through Home Assistant (optional)
+
+Two separate links, one in each direction.
+
+**Core → the house** is the `home-assistant` skill: HA's REST API, a long-lived token in
+`data/secrets/ha_token`. Core can list entities, read one, and call a service.
+
+**The house → Core** is the `core_bridge` service. Home Assistant's built-in Ollama conversation
+agent is the only maintained one that accepts an arbitrary server URL, so the bridge imitates an
+Ollama server — `GET /api/tags` and `POST /api/chat`, NDJSON, streamed. Behind it sits one
+long-lived `pi --mode rpc` process, loading the same extensions `core.sh` does plus a short voice
+profile (`bridge/voice-profile.md`) that asks for one or two spoken sentences.
+
+In Home Assistant: add the **Ollama** integration, URL `http://127.0.0.1:11434`, Model `core`.
+
+> The Model field selects nothing. It is a label the Ollama protocol demands — the bridge throws
+> it away, and Core picks its own LLM from `data/pi/settings.json` as usual. Set **"Control Home
+> Assistant" to off** in the conversation subentry: Core is the brain and already reaches the
+> house through its own skill.
+
+Session handling: HA sends its own message history, but the bridge reads only the newest user
+message and lets pi's session hold the thread — so continuity and long-term memory come for free.
+After 30 minutes of silence it starts a fresh session. One turn runs at a time; a question that
+arrives mid-turn is told to wait rather than queued.
+
+**The port is bound to `127.0.0.1` deliberately.** It is unauthenticated and it runs Core's
+tools. Anyone who can reach it can drive the agent.
+
+---
+
 ## Integrating external services
 
 How Core reaches the outside world. The pattern follows pi's design (and OpenClaw's): **a skill
