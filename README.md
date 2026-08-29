@@ -310,6 +310,20 @@ arrives mid-turn is told to wait rather than queued.
 **The port is bound to `127.0.0.1` deliberately.** It is unauthenticated and it runs Core's
 tools. Anyone who can reach it can drive the agent.
 
+### Voice input
+
+Your phone does not transcribe. The companion app runs only the **wake word** on-device
+(microWakeWord, Android app 2026.2.3+, under Settings → Companion app → Assist for Android) and
+streams the audio to Home Assistant — which needs its own speech-to-text engine. That is the
+`whisper` service.
+
+Add it in HA through the **Wyoming Protocol** integration (`127.0.0.1`, port `10300`), then build
+an Assist pipeline: Whisper for speech-to-text, the Ollama agent for the conversation, and
+**text-to-speech left unset** — Core answers as text in the Assist dialog, it does not speak.
+
+No `--language` is pinned, so Whisper auto-detects and one container can serve both a German and
+an English pipeline. Pick the assistant you want in the app.
+
 ---
 
 ## Integrating external services

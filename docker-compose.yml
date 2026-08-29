@@ -119,6 +119,29 @@ services:
       - TZ=Europe/Berlin
     restart: unless-stopped
 
+  whisper:
+    # Speech to text for Home Assistant's Assist pipeline. The phone does NOT transcribe — the
+    # companion app only runs the wake word on-device (microWakeWord) and streams the audio to
+    # Home Assistant, which needs an STT engine of its own. This is it.
+    #
+    # Same "home" profile as homeassistant: Pi only.
+    profiles: ["home"]
+    image: rhasspy/wyoming-whisper
+    container_name: core_whisper
+    # Host networking, so HA's Wyoming integration finds it at 127.0.0.1:10300 like any other
+    # satellite service on this box.
+    network_mode: host
+    volumes:
+      - ./data/whisper:/data
+    # tiny-int8 is the right starting point on a Pi 4: a 3-second clip in under a second (base
+    # takes about 1.5s). Move up only if it misreads you.
+    #
+    # No --language: whisper then auto-detects, so one container can serve both a German and an
+    # English Assist pipeline. If detection proves unreliable, pin --language de here and run a
+    # second container on another port for English.
+    command: ["--model", "tiny-int8", "--uri", "tcp://0.0.0.0:10300", "--data-dir", "/data"]
+    restart: unless-stopped
+
 networks:
   core_network:
     driver: bridge
