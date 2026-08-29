@@ -144,10 +144,10 @@ services:
     # tiny-int8 is the right starting point on a Pi 4: a 3-second clip in under a second (base
     # takes about 1.5s). Move up only if it misreads you.
     #
-    # No --language: whisper then auto-detects, so one container can serve both a German and an
-    # English Assist pipeline. If detection proves unreliable, pin --language de here and run a
-    # second container on another port for English.
-    command: ["--model", "tiny-int8", "--uri", "tcp://0.0.0.0:10300", "--data-dir", "/data"]
+    # --language de: pinned, not auto-detected. Pinning is more accurate than letting whisper
+    # guess, and this assistant is spoken to in German. For a second language, run another
+    # container on a different port with its own --language and give it its own Assist pipeline.
+    command: ["--model", "tiny-int8", "--language", "de", "--uri", "tcp://0.0.0.0:10300", "--data-dir", "/data"]
     restart: unless-stopped
 
 networks:

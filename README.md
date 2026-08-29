@@ -321,8 +321,9 @@ Add it in HA through the **Wyoming Protocol** integration (`127.0.0.1`, port `10
 an Assist pipeline: Whisper for speech-to-text, the Ollama agent for the conversation, and
 **text-to-speech left unset** — Core answers as text in the Assist dialog, it does not speak.
 
-No `--language` is pinned, so Whisper auto-detects and one container can serve both a German and
-an English pipeline. Pick the assistant you want in the app.
+Whisper is pinned to German (`--language de`) — more accurate than letting it auto-detect. For a
+second language, run another `wyoming-whisper` container on a different port with its own
+`--language`, and give it its own Assist pipeline.
 
 ---
 
