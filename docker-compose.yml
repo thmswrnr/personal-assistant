@@ -141,13 +141,15 @@ services:
     network_mode: host
     volumes:
       - ./data/whisper:/data
-    # tiny-int8 is the right starting point on a Pi 4: a 3-second clip in under a second (base
-    # takes about 1.5s). Move up only if it misreads you.
+    # base-int8, not tiny: tiny mangles anything longer than a short sentence, and murders proper
+    # nouns ("Flohmarkt in der Rheinaue" came back as "Floom macht in der Rheinau"). base is
+    # roughly 1.5s for a 3-second clip on a Pi 4 versus under 1s for tiny — worth it. If it still
+    # misreads you, small-int8 is the next step up, but expect several seconds on a Pi 4.
     #
     # --language de: pinned, not auto-detected. Pinning is more accurate than letting whisper
     # guess, and this assistant is spoken to in German. For a second language, run another
     # container on a different port with its own --language and give it its own Assist pipeline.
-    command: ["--model", "tiny-int8", "--language", "de", "--uri", "tcp://0.0.0.0:10300", "--data-dir", "/data"]
+    command: ["--model", "base-int8", "--language", "de", "--uri", "tcp://0.0.0.0:10300", "--data-dir", "/data"]
     restart: unless-stopped
 
 networks:
