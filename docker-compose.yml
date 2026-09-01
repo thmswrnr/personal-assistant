@@ -86,6 +86,12 @@ services:
     environment:
       - PI_CODING_AGENT_DIR=/app/.pi
       - TZ=Europe/Berlin
+      # The voice model, pinned SEPARATELY from data/pi/settings.json — that file is tuned for the
+      # terminal, where waiting is fine. Home Assistant abandons a slow turn, and a reasoning model
+      # took 88 seconds to answer "hallo". So voice gets a non-reasoning model with thinking off.
+      # Changing the CLI default must never break voice again.
+      - BRIDGE_MODEL=${BRIDGE_MODEL:-comma-soft/gemma4-31b-instant}
+      - BRIDGE_THINKING=${BRIDGE_THINKING:-off}
     ports:
       # Loopback ONLY. This is an unauthenticated endpoint that runs Core's tools — anyone who
       # can reach it can drive the agent. Home Assistant runs with host networking, so it finds

@@ -295,6 +295,12 @@ Ollama server — `GET /api/tags` and `POST /api/chat`, NDJSON, streamed. Behind
 long-lived `pi --mode rpc` process, loading the same extensions `core.sh` does plus a short voice
 profile (`bridge/voice-profile.md`) that asks for one or two spoken sentences.
 
+**The bridge pins its own model** (`BRIDGE_MODEL`, `BRIDGE_THINKING`) rather than inheriting
+`data/pi/settings.json`. Voice and the terminal want opposite things: the terminal can wait for a
+reasoning model, Home Assistant cannot — a thinking model was measured at 88 seconds to answer
+"hallo", far past where Assist gives up. Keeping them separate means changing your CLI default
+never breaks voice.
+
 In Home Assistant: add the **Ollama** integration, URL `http://127.0.0.1:11434`, Model `core`.
 
 > The Model field selects nothing. It is a label the Ollama protocol demands — the bridge throws

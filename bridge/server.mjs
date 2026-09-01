@@ -26,7 +26,17 @@ const MODEL = "core";
 // into today's first question.
 const IDLE_RESET_MS = Number(process.env.BRIDGE_IDLE_RESET_MS || 30 * 60 * 1000);
 
+// A turn that produces nothing for this long is treated as lost, so the bridge can never wedge
+// in a permanently busy state. Generous: a real turn may run tools silently for a while.
+const TURN_TIMEOUT_MS = Number(process.env.BRIDGE_TURN_TIMEOUT_MS || 3 * 60 * 1000);
+
 const PI_DIR = process.env.PI_CODING_AGENT_DIR || "/app/.pi";
+// Voice needs a fast answer, not the best one — Home Assistant gives up on a slow turn, and a
+// reasoning model can spend a minute thinking before it says "hallo". So the bridge pins its own
+// model and thinking level rather than inheriting settings.json, which is tuned for the CLI.
+// Leave BRIDGE_MODEL empty to fall back to pi's default.
+const MODEL_ARG = process.env.BRIDGE_MODEL || "";
+const THINKING_ARG = process.env.BRIDGE_THINKING || "off";
 // The same extensions core.sh loads, so the voice Core and the terminal Core are the same agent.
 const EXTENSIONS = [
   "spill-to-file.mjs",
@@ -41,9 +51,14 @@ const log = (...args) => console.error("[bridge]", ...args);
 // ── the pi process ────────────────────────────────────────────────────────────────────────────
 
 let pi = null;
-// Set while a turn is in flight; holds the callbacks of the HTTP response being streamed to.
+// A turn moves pending -> active only once pi has ACCEPTED our prompt. That ordering is what
+// stops a late event from an earlier turn closing the request we are serving now: while we wait
+// for the acceptance, `active` is null and stray events are ignored.
+let pending = null;
 let active = null;
+let turnId = 0;
 let idleTimer = null;
+let turnTimer = null;
 
 function spawnPi() {
   const args = ["--mode", "rpc"];
@@ -55,6 +70,14 @@ function spawnPi() {
   // Voice needs a different register than the terminal: short, spoken, no markdown.
   args.push("--append-system-prompt", "/app/bridge/voice-profile.md");
   args.push("--name", "Home Assistant voice");
+
+  // Pinned here rather than inherited from settings.json, which is tuned for the CLI. A reasoning
+  // model spent 88 seconds answering "hallo" — Home Assistant abandons a turn long before that.
+  if (MODEL_ARG) {
+    args.push("--model", MODEL_ARG);
+  }
+
+  args.push("--thinking", THINKING_ARG);
 
   log("starting pi", args.join(" "));
   const child = spawn("pi", args, { cwd: "/app", stdio: ["pipe", "pipe", "inherit"] });
@@ -110,6 +133,27 @@ function readEvents(stream, onLine) {
 }
 
 function onEvent(event) {
+  // The reply to our own prompt command, correlated by id. pi rejects a prompt outright when the
+  // agent is already streaming, so this is the only place we learn whether the turn ever started.
+  if (event.type === "response" && event.command === "prompt") {
+    if (!pending || event.id !== pending.id) {
+      return;
+    }
+
+    const turn = pending;
+    pending = null;
+
+    if (event.success) {
+      active = turn;
+      armTurnTimeout();
+    }
+    else {
+      log(`prompt rejected (turn ${turn.id})`);
+      turn.end("Core is still working on the last request. Ask me again in a moment.");
+    }
+    return;
+  }
+
   if (!active) {
     return;
   }
@@ -120,6 +164,8 @@ function onEvent(event) {
     // Only spoken text goes out. Thinking must not reach the dialog, and the Ollama protocol has
     // no channel for tool activity at all.
     if (delta?.type === "text_delta" && delta.delta) {
+      // Text arriving is proof the turn is alive, so push the deadline back.
+      armTurnTimeout();
       active.chunk(delta.delta);
     }
     return;
@@ -136,13 +182,30 @@ function onEvent(event) {
 
 // ── one turn at a time ────────────────────────────────────────────────────────────────────────
 
+// A turn that goes this long without producing text is treated as lost. Without this the busy
+// flag can outlive its turn, and the bridge answers "still working" forever — only a container
+// restart clears it.
+function armTurnTimeout() {
+  clearTimeout(turnTimer);
+  turnTimer = setTimeout(() => {
+    log(`turn ${(active || pending)?.id} produced nothing for ${TURN_TIMEOUT_MS}ms — aborting`);
+    send({ type: "abort" });
+    finish("Core took too long and gave up. Please ask again.");
+  }, TURN_TIMEOUT_MS);
+}
+
 function finish(fallback) {
-  if (!active) {
+  clearTimeout(turnTimer);
+
+  // A prompt still awaiting acceptance has to be closed out too, or its caller hangs.
+  const turn = active || pending;
+
+  if (!turn) {
     return;
   }
 
-  const turn = active;
   active = null;
+  pending = null;
   turn.end(fallback);
   scheduleIdleReset();
 }
@@ -209,15 +272,18 @@ async function handleChat(req, res) {
   res.writeHead(200, { "content-type": "application/x-ndjson" });
 
   // One agent, one turn at a time. Queueing would let a second question steer a turn the caller
-  // can no longer see, so say so and stop instead.
-  if (active) {
+  // can no longer see, so say so and stop instead. pi enforces this too and will reject the
+  // prompt; checking here just saves the round trip.
+  if (active || pending) {
     res.end(chunkLine("Core is still working on the last request. Ask me again in a moment.", true));
     return;
   }
 
+  const id = String(++turnId);
   let wrote = false;
 
-  active = {
+  pending = {
+    id,
     chunk(text) {
       wrote = true;
       res.write(chunkLine(text, false));
@@ -233,13 +299,18 @@ async function handleChat(req, res) {
   // If Home Assistant hangs up (its own timeout, or the user closed the dialog), stop streaming
   // into a dead socket — but let the turn finish, so Core's session stays consistent.
   res.on("close", () => {
-    if (active && res.writableEnded === false) {
-      active.chunk = () => {};
+    const turn = active || pending;
+
+    if (turn?.id === id && res.writableEnded === false) {
+      turn.chunk = () => {};
     }
   });
 
   clearTimeout(idleTimer);
-  send({ type: "prompt", message: last.content });
+  // Armed now, not on acceptance: if pi never answers the prompt command at all, this is what
+  // rescues the caller.
+  armTurnTimeout();
+  send({ id, type: "prompt", message: last.content });
 }
 
 const server = createServer(async (req, res) => {
