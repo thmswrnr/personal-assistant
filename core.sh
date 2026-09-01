@@ -27,11 +27,9 @@ cd "$(dirname "$(readlink -f "$0")")"
 # model ids/globs (e.g. "comma-soft/*"). Leave empty to skip. Switching mid-session also moves
 # inherit-type subagents.
 #
-# Below: every model the hosted `api` provider serves (comma-soft + the GPTs) plus everything the
-# local llama.cpp server offers (see the `local` provider in data/pi/models.json). Ctrl+P cycles
-# between them. Picking a local one needs that server up — pi does not fall back to the hosted API
-# if it's down, and the first call to a cold local model waits for it to load.
-MODELS="comma-soft/*,openai/gpt-5.2,openai/gpt-5.4,gemma-4-12b-it-Q5_K_M,gpt-oss-20b-Q8_0,Qwen3-Coder-30B-A3B-Instruct-Q4_K_M,Qwen3.5-4B-Q6_K"
+# Below: every model the hosted `api` provider serves (comma-soft + the GPTs). Ctrl+P cycles
+# between them.
+MODELS="comma-soft/*,openai/gpt-5.2,openai/gpt-5.4"
 MODELS_ARG=()
 [ -n "$MODELS" ] && MODELS_ARG=(--models "$MODELS")
 CONTAINER="core_harness"
