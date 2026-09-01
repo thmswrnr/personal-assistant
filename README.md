@@ -127,8 +127,8 @@ it, which shows up as occasional working-tree churn — commit or discard as you
 Skills are on-demand capability packages ([Agent Skills standard](https://agentskills.io/specification))
 — a directory with a `SKILL.md` (frontmatter `name` + `description`, then instructions) plus
 optional `scripts/` (executable code), `references/` (on-demand docs), and `assets/` subfolders,
-grouped into category folders under `data/pi/skills/` (`assistant/`, `google/`, `home/`, `web/`,
-`engineering/`; pi's config dir). Folders are just for organization — skills are
+grouped into category folders under `data/pi/skills/` (`assistant/`, `google/`, `home/`, `web/`;
+pi's config dir). Folders are just for organization — skills are
 invoked by `name`, not path. Current skills:
 
 | Skill | What it does |
@@ -154,21 +154,6 @@ invoked by `name`, not path. Current skills:
 | `skill-builder` | Lets Core author or modify its **own** skills — only on explicit request, shown for approval before writing, into the writable `custom_skills/` area (curated skills stay read-only). |
 | `memory` | Save / recall / forget durable facts — and **auto-captures** them at the end of a chat (Core's long-term memory — see below). |
 | `github-pages` | Publish a static site to GitHub Pages (create repo → push → enable Pages). Needs a PAT in `data/secrets/github_token`. |
-
-**Engineering** (under `data/pi/skills/engineering/`) — generic software-engineering workflows, wired to Core's tools (git/`gh`, Google `tasks`, `memory`, `notify`):
-
-| Skill | What it does |
-|---|---|
-| `debug` | Structured debugging session — reproduce, isolate, diagnose, fix, prevent. |
-| `code-review` | Review a diff/PR/file for security, performance, correctness, and maintainability. |
-| `testing-strategy` | Design a test plan — pyramid balance, coverage targets, what to test vs skip. |
-| `system-design` | Design systems/services — requirements, high-level design, scale, trade-offs. |
-| `architecture` | Create or evaluate an Architecture Decision Record (ADR). |
-| `tech-debt` | Identify, categorize, and prioritize technical debt with a scoring framework. |
-| `documentation` | Write technical docs — README, API reference, runbook, architecture doc, onboarding. |
-| `deploy-checklist` | Pre-deployment verification checklist with rollback triggers. |
-| `incident-response` | Triage → communicate → mitigate → blameless postmortem. |
-| `standup` | Generate a yesterday/today/blockers standup update from recent activity. |
 
 > **Invoke skills with `/skill:<name>`** (or `./core.sh skill <name>`) for reliable execution.
 > pi uses *progressive disclosure*: only a skill's description is always in context; the full
