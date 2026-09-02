@@ -35,12 +35,23 @@ RUN arch="$(dpkg --print-architecture)" \
     && rm -rf "/tmp/gh_${GH_VERSION}_linux_${arch}" \
     && gh --version
 
-# TRIAL BRANCH — one of three web chat UIs under evaluation (see README). This one is a
-# Next.js app that drives pi through the SDK in-process, so it must live in THIS image: Core's
-# skills shell out to git, jq, gh and yt-dlp above, and a plain node image would not have them.
-# No native modules, so no build toolchain and no --allow-scripts is needed on arm64.
-ARG PI_WEB_VERSION=0.8.11
-RUN npm install -g "@agegr/pi-web@${PI_WEB_VERSION}"
+# The web chat UI: our patched build of @agegr/pi-web. It drives pi through the SDK
+# in-process, so it must live in THIS image — Core's skills shell out to git, jq, gh and yt-dlp
+# above, and a plain node image would not have them.
+#
+# Installed from a tarball, not the registry, because we carry two patches upstream does not
+# have (see ../webui/): a camera button for the phone, and a title generator that stops
+# re-sending Core's entire system prompt to name a chat.
+#
+# Build the tarball on a machine with node — the Pi has none, and a Next build wants more RAM
+# than it has spare:
+#     ./webui/build.sh
+#     scp core/vendor/pi-web.tgz rpi@rpi:personal-assistant/core/vendor/
+#
+# The tarball is git-ignored. Its .next output carries no native binaries, so it is portable
+# between architectures; npm still installs the runtime dependencies here, for this arch.
+COPY vendor/pi-web.tgz /tmp/pi-web.tgz
+RUN npm install -g /tmp/pi-web.tgz && rm -f /tmp/pi-web.tgz
 
 WORKDIR /app
 # Skills write scratch files to the working dir, so /app must be writable by the non-root

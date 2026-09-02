@@ -62,3 +62,8 @@ data/pi/extensions/*
 !data/pi/agents/*.md
 # Track the skill packages — they are version-controlled source, not runtime state
 !data/pi/skills/
+
+# Web chat UI build artefacts. The patches in webui/patches/ are the source of truth;
+# the clone they are applied to and the tarball they produce are both rebuildable.
+webui/.build/
+core/vendor/

@@ -1,0 +1,7 @@
+# The upstream this fork tracks. build.sh clones exactly this.
+#
+# Bumping it: change the tag, run ./webui/build.sh, and fix whatever patch no
+# longer applies. A conflict here is the point of the patch layout — it tells you
+# which of our changes upstream has moved under.
+repo=https://github.com/agegr/pi-web.git
+ref=v0.8.11

@@ -1,0 +1,102 @@
+diff --git a/components/ChatInput.tsx b/components/ChatInput.tsx
+index 0ffb95a..15c2534 100644
+--- a/components/ChatInput.tsx
++++ b/components/ChatInput.tsx
+@@ -483,6 +483,10 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
+   const controlsMenuRef = useRef<HTMLDivElement>(null);
+   const historyMenuRef = useRef<HTMLDivElement>(null);
+   const fileInputRef = useRef<HTMLInputElement>(null);
++  // Separate from fileInputRef: the capture attribute below makes a phone open the camera
++  // directly. Putting capture on the single input would take the gallery away, and both
++  // are wanted — pick an existing photo, or point the camera at a receipt right now.
++  const cameraInputRef = useRef<HTMLInputElement>(null);
+   const isComposingRef = useRef(false);
+   const lastCompositionEndAtRef = useRef(0);
+   const slashCommandsRequestedRef = useRef(false);
+@@ -1419,6 +1423,20 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
+           e.target.value = "";
+         }}
+       />
++      {/* Hidden camera input — same handler, but capture sends a phone straight to the camera.
++          Desktop browsers ignore capture, which is why the button that opens this is mobile-only. */}
++      <input
++        ref={cameraInputRef}
++        type="file"
++        accept="image/*"
++        capture="environment"
++        style={{ display: "none" }}
++        onChange={(e) => {
++          const files = Array.from(e.target.files ?? []);
++          processImageFiles(files);
++          e.target.value = "";
++        }}
++      />
+       <div style={{ maxWidth: 820, margin: "0 auto" }}>
+         <ModelErrorBanner error={modelError} />
+         <ModelScopeWarningBanner warnings={modelScopeWarnings} />
+@@ -2098,6 +2116,29 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
+                 <polyline points="21 15 16 10 5 21" />
+               </svg>
+             </button>
++            {/* Take a photo. Mobile only: capture does nothing on a desktop browser, so the
++                button would be a second way to open the same picker. */}
++            {isMobile && (
++              <button
++                onClick={() => cameraInputRef.current?.click()}
++                title={t("chat.takePhoto")}
++                style={{
++                  flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center",
++                  width: 32, height: 32, padding: 0,
++                  background: "none", border: "none",
++                  borderRadius: 9,
++                  color: attachedImages.length ? "var(--accent)" : "var(--text-muted)",
++                  cursor: "pointer",
++                  opacity: 1,
++                  transition: "background 0.12s, color 0.12s",
++                }}
++              >
++                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
++                  <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
++                  <circle cx="12" cy="13" r="4" />
++                </svg>
++              </button>
++            )}
+             {/* Model selector - visible always, disabled while the session or switch is busy */}
+             {(modelOptions.length > 0 || model || modelError) && onModelChange && (
+               <ModelSelector
+diff --git a/lib/i18n/messages/en.ts b/lib/i18n/messages/en.ts
+index c4f1d80..dc61be9 100644
+--- a/lib/i18n/messages/en.ts
++++ b/lib/i18n/messages/en.ts
+@@ -313,6 +313,7 @@ export const enLocale: LocalePlugin = {
+     "chat.followUp": "Follow-up",
+     "chat.send": "Send",
+     "chat.attachImage": "Attach image",
++    "chat.takePhoto": "Take photo",
+     "chat.previewImage": "Preview image",
+     "chat.filterModels": "Filter models…",
+     "chat.noMatchingModels": "No matching models",
+diff --git a/lib/i18n/messages/zh-CN.ts b/lib/i18n/messages/zh-CN.ts
+index eedc131..8d08c0c 100644
+--- a/lib/i18n/messages/zh-CN.ts
++++ b/lib/i18n/messages/zh-CN.ts
+@@ -313,6 +313,7 @@ export const zhCNLocale: LocalePlugin = {
+     "chat.followUp": "后续消息",
+     "chat.send": "发送",
+     "chat.attachImage": "附加图片",
++    "chat.takePhoto": "拍照",
+     "chat.previewImage": "预览图片",
+     "chat.filterModels": "筛选模型…",
+     "chat.noMatchingModels": "没有匹配的模型",
+diff --git a/lib/i18n/messages/zh-TW.ts b/lib/i18n/messages/zh-TW.ts
+index 826287d..b628928 100644
+--- a/lib/i18n/messages/zh-TW.ts
++++ b/lib/i18n/messages/zh-TW.ts
+@@ -313,6 +313,7 @@ export const zhTWLocale: LocalePlugin = {
+     "chat.followUp": "後續訊息",
+     "chat.send": "傳送",
+     "chat.attachImage": "附加圖片",
++    "chat.takePhoto": "拍照",
+     "chat.previewImage": "預覽圖片",
+     "chat.filterModels": "篩選模型…",
+     "chat.noMatchingModels": "找不到相符的模型",

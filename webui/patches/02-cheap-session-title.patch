@@ -1,0 +1,254 @@
+diff --git a/lib/session-title.test.mjs b/lib/session-title.test.mjs
+index 1819faf..b28a9ca 100644
+--- a/lib/session-title.test.mjs
++++ b/lib/session-title.test.mjs
+@@ -8,6 +8,8 @@ const jiti = createJiti(import.meta.url);
+ const {
+   appendTitleRequestToTrailingUser,
+   buildSessionTitleAgentOptions,
++  findTitleContextMessage,
++  trimToTitleContext,
+   generateSessionTitle,
+   parseGeneratedSessionTitle,
+   sanitizeTitleMessages,
+@@ -101,7 +103,9 @@ test("waits for the source reply before sending the title prompt", async () => {
+   const result = await generateSessionTitle({ agent: sourceAgent });
+ 
+   assert.equal(result.title, "Wait for Complete Agent Reply");
+-  assert.deepEqual(providerRoles, ["user", "assistant", "user"]);
++  // Only the opening message reaches the provider, with the title request folded
++  // into it — the source agent's reply and system prompt are not re-sent.
++  assert.deepEqual(providerRoles, ["user"]);
+ });
+ 
+ test("generates a title when compaction removed all literal user messages", async () => {
+@@ -142,27 +146,26 @@ test("generates a title when compaction removed all literal user messages", asyn
+   const result = await generateSessionTitle({ agent: sourceAgent });
+ 
+   assert.equal(result.title, "Title Generation After Compaction");
+-  assert.deepEqual(providerMessages.map((message) => message.role), ["user", "assistant", "user"]);
++  assert.deepEqual(providerMessages.map((message) => message.role), ["user"]);
+   assert.match(providerMessages[0].content[0].text, /fix title generation after compaction/);
+ });
+ 
+-test("temporary title agent preserves the provider-facing prefix", async () => {
++test("temporary title agent sends a minimal prefix, not the source agent's", async () => {
+   const model = { provider: "test", id: "cached-model" };
+   const messages = [{ role: "user", content: [{ type: "text", text: "Fix it" }] }];
+-  const originalExecute = async () => ({ content: [], details: {} });
+   const tools = [{
+     name: "read",
+     label: "read",
+     description: "Read a file",
+     parameters: { type: "object", properties: {} },
+-    execute: originalExecute,
++    execute: async () => ({ content: [], details: {} }),
+   }];
+   const convertToLlm = (value) => value;
+   const transformContext = async (value) => value;
+   const streamFunction = () => { throw new Error("not called"); };
+   const source = {
+     state: {
+-      systemPrompt: "cached system prompt",
++      systemPrompt: "a very long agent system prompt",
+       model,
+       thinkingLevel: "high",
+       tools,
+@@ -180,26 +183,43 @@ test("temporary title agent preserves the provider-facing prefix", async () => {
+ 
+   const options = buildSessionTitleAgentOptions(source);
+ 
+-  assert.equal(options.initialState.systemPrompt, source.state.systemPrompt);
++  // The point of the change: none of the source agent's context is re-sent.
++  assert.notEqual(options.initialState.systemPrompt, source.state.systemPrompt);
++  assert.match(options.initialState.systemPrompt, /name chat sessions/i);
++  assert.deepEqual(options.initialState.tools, []);
++  assert.deepEqual(options.initialState.messages, []);
++
++  // The provider wiring still comes from the source, so the title is written by
++  // the same model on the same endpoint as the chat.
+   assert.equal(options.initialState.model, model);
+   assert.equal(options.initialState.thinkingLevel, "high");
+-  assert.equal(options.initialState.messages, messages);
+   assert.equal(options.convertToLlm, convertToLlm);
+   assert.equal(options.transformContext, transformContext);
+   assert.equal(options.streamFn, streamFunction);
+   assert.equal(options.sessionId, "source-session-id");
+-  const withoutExecute = (tool) => Object.fromEntries(
+-    Object.entries(tool).filter(([key]) => key !== "execute"),
+-  );
+-  assert.deepEqual(
+-    options.initialState.tools.map(withoutExecute),
+-    tools.map(withoutExecute),
+-  );
+-  assert.notEqual(options.initialState.tools[0].execute, originalExecute);
+-  await assert.rejects(
+-    options.initialState.tools[0].execute("call", {}, undefined, undefined),
+-    /cannot be executed/,
+-  );
++});
++
++test("title context keeps the opening text, drops images, and truncates", () => {
++  const long = "x".repeat(5000);
++  const trimmed = trimToTitleContext({
++    role: "user",
++    content: [
++      { type: "text", text: long },
++      { type: "image", data: "ignored", mimeType: "image/png" },
++    ],
++  });
++  assert.equal(trimmed.content.length, 1);
++  assert.equal(trimmed.content[0].type, "text");
++  assert.equal(trimmed.content[0].text.length, 2000);
++});
++
++test("title context is the first user message, not the last", () => {
++  const opening = findTitleContextMessage([
++    { role: "user", content: [{ type: "text", text: "first ask" }] },
++    { role: "assistant", content: [{ type: "text", text: "reply" }] },
++    { role: "user", content: [{ type: "text", text: "second ask" }] },
++  ]);
++  assert.equal(opening.content[0].text, "first ask");
+ });
+ 
+ test("keeps only tool calls with adjacent matching results", () => {
+diff --git a/lib/session-title.ts b/lib/session-title.ts
+index 13f214e..970a2f6 100644
+--- a/lib/session-title.ts
++++ b/lib/session-title.ts
+@@ -2,12 +2,18 @@ import {
+   Agent,
+   type AgentMessage,
+   type AgentOptions,
+-  type AgentTool,
+ } from "@earendil-works/pi-agent-core";
+ import type { AgentSession } from "@earendil-works/pi-coding-agent";
+ 
+ const TITLE_TIMEOUT_MS = 90_000;
+ const MAX_TITLE_LENGTH = 80;
++// How much of the opening message the namer gets to see. A title is a summary of
++// the ask, so the first couple of thousand characters carry it.
++const MAX_TITLE_CONTEXT_CHARS = 2_000;
++
++const TITLE_SYSTEM_PROMPT =
++  "You name chat sessions. You are shown the message that opened a session and you "
++  + "reply with a title for it. You have no tools and no other task.";
+ 
+ const TITLE_PROMPT = `Create a concise title for this session based on the conversation above.
+ 
+@@ -29,29 +35,71 @@ export interface GeneratedSessionTitle {
+   };
+ }
+ 
+-function createShadowTools(tools: AgentTool[]): AgentTool[] {
+-  return tools.map((tool) => ({
+-    ...tool,
+-    execute: async () => {
+-      throw new Error("Tools cannot be executed while generating a session title");
+-    },
+-  }));
++/**
++ * Reduce a message to the text a title can be written from. Image blocks are
++ * dropped and long text is cut: naming a session needs the gist of how it
++ * opened, not the whole thing.
++ */
++export function trimToTitleContext(message: AgentMessage): AgentMessage {
++  // A compaction summary carries `summary`, not `content`. It is still the best
++  // description of what the session is about, so it becomes the user turn.
++  if (message.role === "compactionSummary") {
++    return {
++      role: "user",
++      content: [{ type: "text", text: message.summary.slice(0, MAX_TITLE_CONTEXT_CHARS) }],
++      timestamp: message.timestamp,
++    };
++  }
++  // AgentMessage is a union, and several of its members (bash execution, branch
++  // summaries, custom messages) carry no content at all. Only a user turn is
++  // narrowed here; findTitleContextMessage never hands us anything else.
++  if (message.role !== "user") return message;
++  if (typeof message.content === "string") {
++    return { ...message, content: message.content.slice(0, MAX_TITLE_CONTEXT_CHARS) };
++  }
++  const text = message.content
++    .filter((block) => block.type === "text")
++    .map((block) => block.text)
++    .join("\n")
++    .slice(0, MAX_TITLE_CONTEXT_CHARS);
++  return { ...message, content: [{ type: "text", text }] };
++}
++
++/** The message that established what the session is about. */
++export function findTitleContextMessage(messages: AgentMessage[]): AgentMessage | undefined {
++  const opening = messages.find(
++    (message) => message.role === "user" || message.role === "compactionSummary",
++  );
++  return opening ? trimToTitleContext(opening) : undefined;
+ }
+ 
+ /**
+- * Build a temporary Agent configuration whose provider-facing prefix matches
+- * the source Agent. Tool implementations are replaced without changing their
+- * names, descriptions, or schemas, so a naming run cannot mutate the project.
++ * Build a temporary Agent configuration for naming a session.
++ *
++ * Upstream cloned the source Agent's whole provider-facing prefix — system
++ * prompt, every tool definition, and the full message history — so that a
++ * provider's prompt cache would be reused across the naming call. That trade
++ * only pays on an API that bills input tokens and caches them.
++ *
++ * Core talks to an endpoint where it does not pay, so the clone bought nothing
++ * and cost everything: Core's SYSTEM.md, its long-term memory index, its skill
++ * catalogue and every tool schema were re-sent to produce four words. Note the
++ * old shadowing replaced only `execute` — names, descriptions and JSON schemas
++ * still went over the wire, and with Core's skill set that was the bulk of it.
++ *
++ * So the prefix is now purpose-built and tiny. The model, transport and
++ * credentials still come from the source, so the title is written by whichever
++ * model the chat itself is using.
+  */
+ export function buildSessionTitleAgentOptions(source: Agent): AgentOptions {
+   const state = source.state;
+   return {
+     initialState: {
+-      systemPrompt: state.systemPrompt,
++      systemPrompt: TITLE_SYSTEM_PROMPT,
+       model: state.model,
+       thinkingLevel: state.thinkingLevel,
+-      tools: createShadowTools(state.tools),
+-      messages: state.messages,
++      tools: [],
++      messages: [],
+     },
+     convertToLlm: source.convertToLlm,
+     transformContext: source.transformContext,
+@@ -212,20 +260,21 @@ export async function generateSessionTitle(source: AgentSession): Promise<Genera
+   const sourceAgent = source.agent;
+   await sourceAgent.waitForIdle();
+ 
++  // Sanitize first: an orphaned tool call would be rejected by the provider even
++  // though we only keep one message out of the result.
+   const sanitizedMessages = sanitizeTitleMessages(sourceAgent.state.messages);
+-  const historyLength = sanitizedMessages.length;
+-  if (!sanitizedMessages.some(
+-    (message) => message.role === "user" || message.role === "compactionSummary",
+-  )) {
++  const opening = findTitleContextMessage(sanitizedMessages);
++  if (!opening) {
+     throw new Error("The session has no user messages to name");
+   }
+ 
+   const options = buildSessionTitleAgentOptions(sourceAgent);
+-  options.initialState!.messages = sanitizedMessages;
+-  const continuesFromTrailingUser = sanitizedMessages.at(-1)?.role === "user";
+-  if (continuesFromTrailingUser) {
+-    options.initialState!.messages = appendTitleRequestToTrailingUser(sanitizedMessages);
+-  }
++  // Fold the request into the opening message where we can, so the provider does
++  // not receive two user messages in a row.
++  const titleMessages = appendTitleRequestToTrailingUser([opening]);
++  const continuesFromTrailingUser = opening.role === "user";
++  options.initialState!.messages = titleMessages;
++  const historyLength = titleMessages.length;
+ 
+   const temporaryAgent = new Agent(options);
+   const runPromise = continuesFromTrailingUser
