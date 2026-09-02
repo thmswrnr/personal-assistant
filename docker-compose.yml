@@ -102,6 +102,54 @@ services:
     networks:
       - core_network
 
+  core_webui:
+    # TRIAL BRANCH: @agegr/pi-web. A browser chat window for Core — a session sidebar you can
+    # resume from the phone, a streaming thinking output, and a file explorer for the things
+    # Core downloads and writes. Judge it against the criteria in the plan, then keep or drop.
+    #
+    # Same image as core and core_bridge. That is the point: this UI runs the agent IN-PROCESS,
+    # so it needs the same git/jq/gh/yt-dlp that Core's skills shell out to, plus the same
+    # mounts. Anything less would be a different agent wearing Core's name.
+    build:
+      context: ./core
+      dockerfile: Dockerfile
+    image: core-harness
+    container_name: core_webui
+    profiles: ["webui"]
+    user: "node"
+    volumes:
+      - ./data/pi:/app/.pi:rw
+      - ./data/storage:/app/storage:rw
+      - ./data/secrets:/app/secrets:rw
+      - ./data/pi/skills:/app/.pi/skills:ro
+    env_file:
+      - .env
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    # /app is the workspace: this UI has no --cwd flag, so it takes the working directory.
+    working_dir: /app
+    environment:
+      - PI_CODING_AGENT_DIR=/app/.pi
+      - TZ=Europe/Berlin
+      # HTTP Basic Auth (user "pi"). REQUIRED, not optional: without it the package prints a
+      # warning and serves an agent that runs arbitrary tools to anyone on the network. Compose
+      # refuses to start rather than expose that, so set WEBUI_PASSWORD in .env.
+      - PI_WEB_PASSWORD=${WEBUI_PASSWORD:?set WEBUI_PASSWORD in .env before starting core_webui}
+      # Next.js rejects a Host header it does not know. Add the Pi's hostname and LAN IP here,
+      # comma-separated, or the phone gets a blank page.
+      - PI_WEB_ALLOWED_HOSTS=${WEBUI_ALLOWED_HOSTS:-}
+    ports:
+      # LAN, not loopback — the whole point is reaching it from the couch. Basic Auth above is
+      # the only thing in front of it, and it travels in clear over HTTP, so this belongs on the
+      # home network ONLY. Do not port-forward it.
+      - "0.0.0.0:30141:30141"
+    # -H 0.0.0.0 so it answers inside the container's network namespace, not just its loopback.
+    # --no-open because there is no browser in here to open.
+    command: ["pi-web", "-H", "0.0.0.0", "-p", "30141", "--no-open"]
+    restart: unless-stopped
+    networks:
+      - core_network
+
   homeassistant:
     # Home automation. Only starts under the "home" profile, so a dev box without the Zigbee
     # stick still runs `docker compose up -d` unchanged. On the Pi:

@@ -35,6 +35,13 @@ RUN arch="$(dpkg --print-architecture)" \
     && rm -rf "/tmp/gh_${GH_VERSION}_linux_${arch}" \
     && gh --version
 
+# TRIAL BRANCH — one of three web chat UIs under evaluation (see README). This one is a
+# Next.js app that drives pi through the SDK in-process, so it must live in THIS image: Core's
+# skills shell out to git, jq, gh and yt-dlp above, and a plain node image would not have them.
+# No native modules, so no build toolchain and no --allow-scripts is needed on arm64.
+ARG PI_WEB_VERSION=0.8.11
+RUN npm install -g "@agegr/pi-web@${PI_WEB_VERSION}"
+
 WORKDIR /app
 # Skills write scratch files to the working dir, so /app must be writable by the non-root
 # runtime user.
