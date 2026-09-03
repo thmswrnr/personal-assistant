@@ -13,7 +13,7 @@
     "/app/.pi/extensions/memory.mjs",
     "/app/.pi/extensions/memory-capture.mjs"
   ],
-  "defaultProvider": "api",
+  "defaultProvider": "Comma Soft AG",
   "defaultModel": "comma-soft/gemma4-31b-instant",
   "defaultThinkingLevel": "medium",
   "theme": "dark",

@@ -1,66 +1,42 @@
 {
-  // ── Your model provider ───────────────────────────────────────────────────────────────────
-  // Core is model-agnostic. To point it at ANY OpenAI-compatible API, edit just three things:
-  //   1. baseUrl below            — your endpoint (this file)
-  //   2. LLM_API_KEY in .env      — your key (env, so it stays out of version control)
-  //   3. defaultModel in settings.json + the model id(s) listed here
-  //
-  // "openai-completions" is the OpenAI chat-completions wire format — spoken by Alan, OpenAI,
-  // Groq, OpenRouter, Together, vLLM, LM Studio, llama.cpp, and most others. apiKey supports
-  // $ENV interpolation ($LLM_API_KEY here); baseUrl is a literal string. If you self-host a
-  // model (llama.cpp, vLLM, LM Studio, …), set baseUrl to its host:port and any LLM_API_KEY value
-  // (a local server ignores it). For pi's BUILT-IN providers (anthropic/openai/gemini, etc.)
-  // you don't need an entry here at all — set their standard key env var and reference the model
-  // as "<provider>/<id>" in settings.json.
-  //
-  // Shipped default: Comma-Soft Alan's OpenAI-compatible endpoint. Change it to your own.
   "providers": {
-    "api": {
-      "baseUrl": "https://app.alan.de/api/v1/oai",
+    "Comma Soft AG": {
       "api": "openai-completions",
       "apiKey": "$LLM_API_KEY",
-      "compat": {
-        "supportsDeveloperRole": false,
-        "supportsReasoningEffort": false
-      },
+      "baseUrl": "https://app.alan.de/api/v1/oai",
       "models": [
         {
           "id": "comma-soft/gemma4-31b",
-          "name": "Gemma 4 — thinking",
           "reasoning": true,
-          "input": ["text", "image"],
+          "input": [
+            "text",
+            "image"
+          ],
           "contextWindow": 200000,
           "maxTokens": 32768,
-          "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 }
+          "name": "Gemma4 31B"
         },
         {
           "id": "comma-soft/gemma4-31b-instant",
-          "name": "Gemma 4 — instant (no reasoning)",
-          "reasoning": false,
-          "input": ["text", "image"],
+          "input": [
+            "text",
+            "image"
+          ],
+          "reasoning": true,
           "contextWindow": 200000,
           "maxTokens": 32768,
-          "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 }
-        },
-        {
-          "id": "openai/gpt-5.2",
-          "name": "GPT-5.2",
-          "reasoning": true,
-          "input": ["text", "image"],
-          "contextWindow": 400000,
-          "maxTokens": 32768,
-          "compat": { "maxTokensField": "max_completion_tokens" },
-          "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 }
+          "name": "Gemma4 31B (Instant)"
         },
         {
           "id": "openai/gpt-5.4",
           "name": "GPT-5.4",
           "reasoning": true,
-          "input": ["text", "image"],
+          "input": [
+            "text",
+            "image"
+          ],
           "contextWindow": 400000,
-          "maxTokens": 32768,
-          "compat": { "maxTokensField": "max_completion_tokens" },
-          "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 }
+          "maxTokens": 32768
         }
       ]
     }

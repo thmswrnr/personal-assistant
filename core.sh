@@ -29,7 +29,7 @@ cd "$(dirname "$(readlink -f "$0")")"
 #
 # Below: every model the hosted `api` provider serves (comma-soft + the GPTs). Ctrl+P cycles
 # between them.
-MODELS="comma-soft/*,openai/gpt-5.2,openai/gpt-5.4"
+MODELS="comma-soft/*,openai/gpt-5.4"
 MODELS_ARG=()
 [ -n "$MODELS" ] && MODELS_ARG=(--models "$MODELS")
 CONTAINER="core_harness"
