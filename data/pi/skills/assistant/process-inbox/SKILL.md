@@ -1,15 +1,17 @@
 ---
 name: process-inbox
-description: Process local FILES/DOCUMENTS/IMAGES the user dropped into the storage inbox folder — read each (including photos, screenshots, receipts, scans), summarize into artefacts, capture action items into todos, then archive the original. Use for requests about local files, e.g. "process my files", "go through the documents I dropped", "process the inbox folder". (Local files — NOT email; for email use the gmail skill.)
+description: Process the FILES/DOCUMENTS/IMAGES the user dropped for Core — in their Google Drive `__inbox__` folder or in the local storage inbox. ALWAYS pulls the Drive inbox in first, then reads each file (photos, screenshots, receipts, scans, PDFs, Office documents), summarizes into artefacts, captures action items into todos, and archives the original. Use for "process my inbox", "check my inbox", "process my files", "go through the documents I dropped". (Files — NOT email; for email use the gmail skill.)
 ---
 
 # Process Inbox
 
-Turn raw files in the inbox into organized artefacts and actionable todos. Work through the
-inbox one file at a time and leave a clean audit trail.
+Turn raw files into organized artefacts and actionable todos. Files arrive in two places and this
+skill always covers both: the **Drive inbox** is pulled into the **local inbox** first, then the
+local inbox is worked through one file at a time, leaving a clean audit trail.
 
 ## Paths
 
+- Drive source: the `__inbox__` folder in Google Drive (pulled in at step 1)
 - Inbox:     `/app/storage/inbox/`
 - Artefacts: `/app/storage/artefacts/`   (the "second brain")
 - Tasks:     the user's Google Tasks lists — add via the `tasks` skill (not a local file)
@@ -17,18 +19,31 @@ inbox one file at a time and leave a clean audit trail.
 
 ## Steps
 
-1. **List the inbox.** First ensure the folders exist:
-   `mkdir -p /app/storage/inbox /app/storage/artefacts /app/storage/archived`. Then
-   `ls /app/storage/inbox/`. Delete any Windows download-marker files first — names ending
-   in `Zone.Identifier` are not content (`rm /app/storage/inbox/*Zone.Identifier* 2>/dev/null`).
-   If the inbox is then empty, tell the user there's nothing to process and stop.
+1. **Pull, then list — one command per call.** Run these as **four separate bash calls**. Never
+   join them with `&&`: a failure in one silently swallows the next, which is exactly how an
+   inbox full of files once got reported as empty.
+   a. **Pull the Drive inbox.** Use the **drive** skill to pull the `__inbox__` folder into the
+      local inbox. Report the filenames it pulled. If it reports the folder is missing, or lists
+      anything under `skipped`, **tell the user that verbatim** — never swallow it.
+   b. `mkdir -p /app/storage/inbox /app/storage/artefacts /app/storage/archived`
+   c. `rm -f /app/storage/inbox/*Zone.Identifier*` — Windows download markers, not content.
+      (`-f`, so matching nothing still succeeds.)
+   d. `ls -A /app/storage/inbox/` — **this listing is your only evidence of what is in the
+      inbox.** A command that exits non-zero, or prints nothing at all, is a FAILED CHECK, not an
+      empty inbox: say what failed and stop. Only a successful `ls -A` that printed nothing means
+      the inbox is empty — then tell the user there's nothing to process and stop.
 2. **For each file, complete ALL FOUR sub-steps before moving to the next file.** A file is
    only finished once it has been archived (step d). Do not stop after writing the artefact.
-   a. **Read** it. Plain text / markdown / code: read directly. **Images** (photos,
-      screenshots, receipts, scans): read them too — the model can see images — and pull
-      out the useful content (e.g. a receipt → vendor, total, date; a screenshot → the
-      text/info shown). For any other binary type you genuinely cannot read, note that
-      instead of guessing — but still archive it in step d.
+   a. **Read** it, by kind:
+      - **Images** (photos, screenshots, receipts, scans): read them directly — the model can
+        see images — and pull out the useful content (e.g. a receipt → vendor, total, date; a
+        screenshot → the text/info shown).
+      - **Plain text / markdown / code:** read directly.
+      - **Documents** (PDF, docx, pptx, xlsx, and the other formats it covers): use the
+        **documents** skill to extract the text, then work from that.
+      - Anything that comes back unreadable (an old `.doc`, a scan with no text layer, a binary
+        type nothing handles): note that plainly instead of guessing — but still archive it in
+        step d.
    b. **Summarize** it into a new artefact at `/app/storage/artefacts/<short-slug>.md` with a
       title, a 2–4 sentence summary, the original filename, and today's date (get it with
       `date +%Y-%m-%d` via bash). Keep one artefact per inbox item. **Exception:** if it's a
@@ -49,16 +64,19 @@ inbox one file at a time and leave a clean audit trail.
       Show the classified breakdown before appending — the categories are your work, not the
       user's (see the `haushaltsbuch` skill).
    d. **Archive** the original with bash: `mv /app/storage/inbox/<file> /app/storage/archived/`.
-3. **Verify before finishing.** Run `ls /app/storage/inbox/` again — it must be empty (every
+3. **Verify before finishing.** Run `ls -A /app/storage/inbox/` again — it must be empty (every
    file moved to `archived/`). If anything remains, you are not done: go back and finish it.
-4. **Report** a concise summary to the user: how many items processed, the artefacts created,
-   and any new todos. Mention anything you skipped or couldn't read.
+4. **Report** a concise summary to the user: what was pulled from Drive, how many items
+   processed, the artefacts created, and any new todos. Mention anything you skipped or
+   couldn't read.
 
 You are NOT done until every inbox file has been handled (an artefact, or logged as an expense)
 AND has been moved to `archived/`.
 
 ## Rules
 
+- **A failed command is not an empty inbox.** Non-zero exit, or no output where output was
+  expected, means the check failed — report it and stop. Never chain these checks with `&&`.
 - Never delete inbox files — always *move* them to `archived/`.
 - Don't invent content for files you couldn't read; flag them instead.
 - Keep artefacts short and scannable; the goal is a useful second brain, not a transcript.

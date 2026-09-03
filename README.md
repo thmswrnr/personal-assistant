@@ -146,11 +146,12 @@ invoked by `name`, not path. Current skills:
 | `websearch` | Web search via the private SearXNG instance. |
 | `web-read` | Fetch a URL and extract its main readable text (to summarize/answer from). |
 | `notify` | Send *you* a Telegram message (hard-limited to your chat). |
-| `process-inbox` | Read each file in `inbox/` (incl. **images** via vision) → note + todos → archive. |
+| `process-inbox` | Pull the Drive `__inbox__` folder into `inbox/`, then read each file (**images** via vision, documents via `documents`) → note + todos → archive. |
+| `documents` | Read the text of a PDF, Word, PowerPoint or Excel file (also html/csv/json/xml/epub/zip) — `markitdown` in the image prints it as Markdown. Images are read directly instead. |
 | `morning-briefing` | Dated greeting + unread email + today's calendar + weather + a joke. |
 | `tasks` | Multi-list task manager backed by **Google Tasks** (syncs to the Google Tasks app + Gmail/Calendar side panel) — routes by intent across your lists (Todo, Einkaufsliste/shopping, Inbox/capture); add / list / complete, due dates. |
 | `project-planning` | Break any task/problem into a structured plan; saves real projects to their own `storage/projects/<slug>/` folder (`plan.md` + a plain-markdown `todos.md`). |
-| `haushaltsbuch` | Log expenses to your `haushaltsbuch<year>` Google Sheet — classifies receipt items by category, sums per category, appends one row per category to the "Variable Ausgaben" tab. Markdown-only skill on top of `sheets`. |
+| `haushaltsbuch` | Log expenses to your `haushaltsbuch<year>` Google Sheet — classifies each receipt item on its own, handles Pfand and discounts, sums per category, appends one row per category to the "Variable Ausgaben" tab, and asks only about the lines that are genuinely ambiguous. Markdown-only skill on top of `sheets`. |
 | `skill-builder` | Lets Core author or modify its **own** skills — only on explicit request, shown for approval before writing, into the writable `custom_skills/` area (curated skills stay read-only). |
 | `memory` | Save / recall / forget durable facts — and **auto-captures** them at the end of a chat (Core's long-term memory — see below). |
 | `github-pages` | Publish a static site to GitHub Pages (create repo → push → enable Pages). Needs a PAT in `data/secrets/github_token`. |
@@ -336,8 +337,9 @@ Adding a service, by case:
    API, so the token never enters the model's context. Most skills are this case.
 2. **A mature official CLI exists** (e.g. `gh`, `yt-dlp`) → install it in
    **`core/Dockerfile`** (pinned) and rebuild once; the `SKILL.md` documents how to call it.
-   Already baked in: **`yt-dlp`** (youtube) and **`gh`** (github-pages). Both are tiny and
-   harmless if unused, so they're installed regardless to keep setup simple.
+   Already baked in: **`yt-dlp`** (youtube), **`gh`** (github-pages), and **`markitdown`**
+   (documents — in its own uv virtualenv at `/opt/doctools`). All are harmless if unused, so
+   they're installed regardless to keep setup simple.
 
 Declare dependencies in `SKILL.md` frontmatter (OpenClaw-compatible):
 ```yaml

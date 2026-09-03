@@ -194,16 +194,15 @@ async function downloadToInbox(token, meta) {
 }
 
 // Pulls every file from the Drive __inbox__ folder into the local inbox, then trashes the Drive
-// original so the folder clears. PDFs are ignored for now (no PDF processing yet) and left in
-// place. This only ingests + clears Drive; the `process-inbox` skill does the actual processing
-// (artefacts/todos/archive) afterwards. Returns a summary — an empty folder is a normal result,
+// original so the folder clears. Every file type comes across — PDFs and Office documents are
+// read by the `documents` skill. This only ingests + clears Drive; the `process-inbox` skill
+// does the actual processing (artefacts/todos/archive) afterwards. Returns a summary — an empty folder is a normal result,
 // not an error.
 async function cmdInboxPull(token) {
   const folderId = await findFolder(token, INBOX_FOLDER_NAME);
   if (!folderId) return { folder: INBOX_FOLDER_NAME, note: "folder not found in Drive", ingested: [] };
 
-  // Ignore PDFs until we have a way to read them — leave them sitting in the Drive folder.
-  const targets = (await listChildren(token, folderId)).filter((f) => f.mimeType !== "application/pdf");
+  const targets = await listChildren(token, folderId);
   if (targets.length === 0) return { folder: INBOX_FOLDER_NAME, ingested: [] };
 
   const ingested = [];

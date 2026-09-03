@@ -77,11 +77,10 @@ then upload it.
 
 ## Drive `__inbox__` ingest (`inbox-pull`)
 
-`drive.mjs inbox-pull` empties a Drive folder named `__inbox__` into Core. It downloads every
-**non-PDF** file into the local inbox (`/app/storage/inbox/`) and **trashes** the Drive original
-so the folder stays clear. PDFs are ignored for now and left in place. It prints
-`{folder, localInbox, ingested, skipped?}`; an empty folder gives an empty `ingested` list, which
-is a normal result, not an error.
+`drive.mjs inbox-pull` empties a Drive folder named `__inbox__` into Core. It downloads **every**
+file into the local inbox (`/app/storage/inbox/`) and **trashes** the Drive original so the folder
+stays clear. It prints `{folder, localInbox, ingested, skipped?}`; an empty folder gives an empty
+`ingested` list, which is a normal result, not an error.
 
 Run it when the user asks to pull in, fetch, or ingest their Drive inbox ("get the files I put in
 Drive"). Follow it with `/skill:process-inbox` to actually handle what landed (artefact, todos,

@@ -35,6 +35,23 @@ RUN arch="$(dpkg --print-architecture)" \
     && rm -rf "/tmp/gh_${GH_VERSION}_linux_${arch}" \
     && gh --version
 
+# Document text extraction for the `documents` skill: markitdown, in its own virtualenv under
+# /opt so nothing Python-side can collide with the harness. It reads pdf, docx, pptx and xlsx
+# (plus html, csv, json, xml, epub and zip) and prints Markdown on stdout — pi's own `read` tool
+# handles images only, so without this Core cannot open a document at all.
+#
+# uv brings its own standalone CPython (this image has no system Python) — UV_PYTHON_INSTALL_DIR
+# puts it under /opt instead of root's home, and the chmod makes both readable for the non-root
+# runtime user. --no-cache keeps uv's download cache out of the layer.
+COPY --from=ghcr.io/astral-sh/uv:0.12.9 /uv /usr/local/bin/uv
+ARG MARKITDOWN_VERSION=0.1.7
+ENV UV_PYTHON_INSTALL_DIR=/opt/uv-python
+RUN uv venv --python 3.12 /opt/doctools \
+    && uv pip install --no-cache --python /opt/doctools/bin/python \
+      "markitdown[pdf,docx,pptx,xlsx]==${MARKITDOWN_VERSION}" \
+    && chmod -R a+rX /opt/uv-python /opt/doctools \
+    && /opt/doctools/bin/markitdown --help > /dev/null
+
 # The web chat UI: our patched build of @agegr/pi-web. It drives pi through the SDK
 # in-process, so it must live in THIS image — Core's skills shell out to git, jq, gh and yt-dlp
 # above, and a plain node image would not have them.

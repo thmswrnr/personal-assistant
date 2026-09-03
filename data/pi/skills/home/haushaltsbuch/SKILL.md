@@ -1,92 +1,242 @@
 ---
 name: haushaltsbuch
-description: Add expenses to the user's Haushaltsbuch (household budget) Google Sheet. Use when the user wants to log spending — "ich war einkaufen", "trag ins haushaltsbuch ein", "log this expense", reading off a Kassenbon/receipt grouped by category, any "X € for <category>", OR when the user sends/drops a photo or scan of a receipt/invoice (Kassenbon, Rechnung) — read it with vision and log it. Appends rows to the "Variable Ausgaben" tab only.
+description: Add expenses to the user's Haushaltsbuch (household budget) Google Sheet. Use when the user wants to log spending — "ich war einkaufen", "trag ins haushaltsbuch ein", "log this expense", reading off a Kassenbon/receipt grouped by category, any "X € for <category>", OR when the user sends/drops a photo or scan of a receipt/invoice (Kassenbon, Rechnung) — read it with vision and log it. Classifies mixed receipts item by item, handles Pfand and discounts, and appends rows to the "Variable Ausgaben" tab only.
 metadata:
   { "core": { "requires": { "bins": ["node"], "files": ["/app/secrets/google_oauth.json"] } } }
 ---
 
 # Haushaltsbuch
 
+Classify common receipt items correctly **without unnecessary questions**, while still asking
+when a line is genuinely ambiguous.
+
 The user keeps a yearly budget spreadsheet **`haushaltsbuch<year>`** (e.g. `haushaltsbuch2026`)
-with three tabs. You only ever **append rows to `Variable Ausgaben`** — everything else is the
-user's to edit by hand.
+with three tabs. You only ever **append rows to `Variable Ausgaben`** — everything else is read-only.
 
 - **Variable Ausgaben** — the line-item list. The only tab you write to.
-- **Kategorien** — the canonical categories: column A is the name (feeds the dropdowns), column B
-  describes what belongs in it. Read-only, but your guide for classifying items.
-- **Übersicht** — auto-aggregates the entries; all formulas. Never touch it.
+- **Kategorien** — the canonical categories: column A is the name, column B describes what belongs in it.
+- **Übersicht** — formulas only. Never touch it.
 
-## The row
+## Row format
 
-| A Datum | B Betrag | C Kategorie | D Notiz (optional) |
-|---------|----------|-------------|--------------------|
+| A Datum | B Betrag | C Kategorie | D Notiz |
+|---------|----------|-------------|---------|
 | `16.06.2026` | `12,45 €` | `Lebensmittel` | `Rewe` |
 
-- **Datum** — `DD.MM.YYYY`. Default to today unless a date is given (or read off a receipt).
-- **Betrag** — `12,45 €`: comma decimal, a space, then `€`. Match exactly — the German-locale sheet
-  parses this to a real number; dots or a missing `€` break the Übersicht sums.
-- **Kategorie** — must match a **Kategorien** name verbatim (it feeds a dropdown). Classify each
-  item on its own (`read Kategorien!A:B`, use the column-B descriptions); don't default a whole
-  receipt to one category. Can't tell what an item is (cryptic abbreviation, unknown brand)? Do
-  one `websearch`; if it's still unclear, ask — never assign a category you're unsure of, and don't
-  invent one. `Sonstiges` is only for things that genuinely fit nothing.
-- **Notiz** — the shop name (`Rewe`, `dm`, `Aldi`), plus a detail if the user gives one
-  (`Rewe — Geburtstagsgeschenk`).
+- **Datum** — `DD.MM.YYYY`. Use the receipt's date when present; otherwise today.
+- **Betrag** — `12,45 €`: comma decimal, space, then `€`.
+- **Kategorie** — must match a real value from `Kategorien` exactly.
+- **Notiz** — usually the merchant name (`Rewe`, `dm`, `Esso`).
 
-## Grouping — one row per category, per trip
+## Core flow
 
-A receipt has many items but you don't add a row per item: group the trip's items by category and
-sum within each → **one row per category**. E.g. 10 items = 5 Lebensmittel + 2 Kleidung +
-3 Medikamente ⇒ 3 rows, all dated that day, shop in Notiz.
+1. Find this year's sheet by exact name: `haushaltsbuch<year>`.
+2. Read `Kategorien!A1:B40`.
+3. Extract from the receipt:
+   - merchant
+   - date
+   - line items
+   - printed total
+4. Classify **each item** first, then group by category.
+5. Reconcile grouped sums to the printed total.
+6. Show the proposed rows to the user.
+7. Append only after the user approves.
 
-Each trip is independent: **always append, never merge.** Shopping again the same day — even the
-same shop and category — is a new row; duplicates of the same date+category are correct and
-expected. (Grouping is within one trip, not across the day; the skill is append-only by design.)
+## Grouping
 
-## Logging a trip
+Use **one row per category, per receipt/trip**.
 
-Usual flow: the user reads off the receipt. Classify each item, sum per category, confirm the rows,
-then append them in a single call. Use the **sheets** skill for all spreadsheet access (so the user's
-own spreadsheet skill works too) — it does three things here:
+Example:
+- 5 Lebensmittel items
+- 2 Hygieneartikel
+- 1 Rauchen
 
-1. **Find this year's book** — look up the spreadsheet by exact name (e.g. `haushaltsbuch2026`) to get its id.
-2. **Read the categories** — read `Kategorien!A1:B40` (col A = name, col B = what belongs) to classify items.
-3. **Append one row per category** — amounts summed within each, shop in Notiz (col D), to the
-   `Variable Ausgaben` tab, all rows in a single append:
+becomes 3 rows, all with the same date and merchant note.
 
-   | A Datum | B Betrag | C Kategorie | D Notiz |
-   |---------|----------|-------------|---------|
-   | `16.06.2026` | `35,12 €` | `Lebensmittel` | `Rewe` |
-   | `16.06.2026` | `24,90 €` | `Kleidung` | `Rewe` |
-   | `16.06.2026` | `18,40 €` | `Arzt/Medikamente` | `Rewe` |
+Never merge across separate receipts, even on the same day.
 
-## From a photo or scan
+## Confidence policy
 
-Receipts often arrive as an image — sent via Telegram or dropped in the inbox (`process-inbox`
-hands it here). Read it with vision, then run the same classify → group → append flow, plus:
+Classify decisively where the evidence is strong; spend a question only where it is not.
 
-1. **Pull from the image:** shop name (header), date (use the receipt's `DD.MM.YYYY`/`DD.MM.YY`, not
-   today), the line items with prices, and the printed total (Summe/Gesamt).
-2. **Reconcile:** your per-category sums should equal the printed total. If they don't, something
-   was misread or there's a Pfand/discount line — say so and check, don't force it.
-3. **Show the parsed amounts for an OK before writing** — phone-photo OCR misreads digits. If an
-   amount or the date is genuinely unreadable, ask; never guess at money.
+### Auto-classify without asking
+Auto-classify when:
+- the item text clearly names a known product type or brand family
+- the merchant context strongly supports the class
+- the classification is consistent with the sheet's category descriptions
 
-## Corrections
+### Ask only for the specific ambiguous item
+Ask a follow-up only when:
+- OCR is too poor to reliably read the item or amount
+- a branded/abbreviated item could plausibly belong to multiple categories
+- the category materially changes the bookkeeping and there is no strong lexical clue
 
-If the user says an item belongs to a different category, move **only that item**: subtract its
-amount from the old category's row and add it to the new one — every other item stays put — then
-re-show the breakdown. A correction touches one item, not the whole trip.
+### Do not block the whole receipt
+If one item is ambiguous, isolate it. Classify the rest, explain the one uncertain line, and ask
+only about that line.
+
+## Classification heuristics
+
+Always read the actual `Kategorien` tab first, then apply these heuristics.
+
+### Lebensmittel
+Classify as **Lebensmittel**:
+- groceries from supermarkets
+- drinks, snacks, bread, dairy, fruit, vegetables
+- kiosk/tankstelle food and drinks
+- convenience food
+- meat snacks like **Beef Jerky** / **Jack Link's**
+- beer, soft drinks, tea, water
+- mints / lozenges / cough sweets sold as food items like `Fisherman's Friend`
+- receipt lines like `KOERN`, `HUETTENK`, `BLATTSALAT`, `CHERRYTOMATE`, `FUZE TEE`, `LIPTON`
+
+### Rauchen
+Classify as **Rauchen**:
+- tobacco products and brands
+- cigarettes, rolling tobacco, cigars/cigarillos, papers, filters
+- receipt lines containing or strongly matching brands/terms like:
+  - `Pueblo`
+  - `Marlboro`
+  - `Lucky Strike`
+  - `Camel`
+  - `Winston`
+  - `Chesterfield`
+  - `Gauloises`
+  - `Pall Mall`
+  - `Drum`
+  - `Javaanse`
+  - `Gizeh`
+  - `OCB`
+  - `Filter Tips`
+
+**Important:** if a tobacco brand is recognizable, do **not** ask just because the OCR truncates it.
+
+Example:
+- `Pueblo Blue PC` → **Rauchen**
+
+### Nahrungsergänzungsmittel
+Classify as **Nahrungsergänzungsmittel**:
+- magnesium, creatine, protein powder, vitamins, zinc
+- common supplement terms like `Whey`, `Creatin`, `Magnesium`, `Zink`, `Vitamin D`
+
+### Kleidung
+Classify as **Kleidung**:
+- clothing of all kinds, including sports clothing
+- shirts, shorts, training tops, running shorts, jackets, trousers
+
+**Important:** sports clothing is still **Kleidung**.
+Use **Sportequipment** for gear/equipment, not apparel.
+
+### Büroartikel
+Classify as **Büroartikel**:
+- stationery and office-like small items
+- batteries, especially receipt lines like `AAA`, `Micro AAA`
+
+### Hygieneartikel
+Classify as **Hygieneartikel**:
+- body/personal care only
+- shampoo, soap, deodorant, toothpaste, toilet paper, body care, razors
+- hair styling / grooming products like `Haarspray`, `HS`, `Pflege&Halt`, `Extra Stark`
+
+**Important:** Hygieneartikel is for the body/person, not household cleaning.
+
+### Reinigungsartikel
+Classify as **Reinigungsartikel**:
+- detergent, cleaning sprays, dishwashing products, sponges, trash bags, paper towels
+- descaling / machine-cleaning products like `Entkalker`
+
+### Tanken
+Classify as **Tanken**:
+- fuel lines such as `Diesel`, `Super`, `Super E10`, `Ultimate`, liters of fuel
+- never confuse this with kiosk food from a petrol station
+
+### Auswärts Essen/Trinken
+Classify as **Auswärts Essen/Trinken**:
+- restaurant, café, bar, bakery meal, takeaway meal, prepared hot food where the purchase is
+  clearly a meal rather than groceries
+
+### Sonstiges
+Use **Sonstiges** only if nothing else fits and there is no better canonical category.
+
+Examples:
+- bike maintenance products like `Kettenreiniger`
+
+## Receipt mechanics
+
+### Pfand
+Treat deposit lines as part of the same shopping trip total.
+
+- Positive `Pfand` lines increase the total.
+- Negative `Leergut` lines decrease the total.
+- Do **not** create a separate Pfand category.
+- Keep the receipt reconciling to the printed total.
+
+If the receipt is otherwise all beverages/food, keep the Pfand effect within the grouped food total.
+If the receipt spans multiple categories, include the deposit effect in the most directly related
+beverage/food grouping unless the receipt structure makes a different allocation obvious.
+
+### Discounts / coupons
+Discounts reduce the trip total and should be reflected in the grouped category totals. Do not ignore them.
+If a discount clearly belongs to a specific product/category, apply it there. If not, distribute it
+in the least surprising way that still reconciles.
+
+### Mixed receipts
+Mixed receipts are normal. Classify item-by-item, then sum per category. Never force a whole mixed
+receipt into one category just because most lines belong there.
+
+## OCR and unknown brands
+
+For cryptic lines:
+1. use merchant context
+2. use product keywords
+3. use brand recognition
+4. if still unclear, do one `websearch`
+5. if still unclear after that, ask
+
+Do not ask when the evidence is already strong enough.
+
+### OCR interpretation
+When OCR is slightly wrong but the intended product is strongly recoverable from context, prefer
+the corrected interpretation over a literal but implausible read.
+
+Examples:
+- `IS Pflege&Halt` on a supermarket/drugstore receipt may actually be `HS Pflege&Halt`
+- `IS Extra Stark` may actually be `HS Extra Stark`
+
+Merchant context helps, but item semantics win.
+
+## Examples
+
+### Example 1 — Esso kiosk receipt
+Receipt lines:
+- `Bit Pils Dos 0,5` → Lebensmittel
+- `DPG Pfand 0.25x1` → part of beverage total, not its own category
+- `Pueblo Blue PC` → Rauchen
+- `Beef Jerky Origina` → Lebensmittel
+- `Beef Jerky Sweet&H` → Lebensmittel
+- `Jack Link's BeefBar` → Lebensmittel
+
+Proposed grouped rows:
+- `09.08.2026 | 15,45 € | Lebensmittel | Esso`
+- `09.08.2026 | 6,75 € | Rauchen | Esso`
+
+Do **not** ask about `Pueblo Blue` if the tobacco brand is recognizable.
+
+### Example 2 — Rewe groceries with Pfand
+Receipt lines:
+- bread, salad, tomatoes, onions, dairy → Lebensmittel
+- `Pfand 0,25` and `Leergut Einweg -1,50` affect the total
+- final grouped result may still be a single Lebensmittel row if all purchased items are groceries
+
+### Example 3 — Ask only the narrow question
+If one line reads `ABC Active+` and OCR gives no useful clue:
+- classify the rest
+- ask only: “I can classify everything except `ABC Active+`. What category should that one use?”
 
 ## Rules
 
-- **Show the rows before appending.** Not permission to act — you already have that — but a
-  check on *your own* work: the user reads off amounts, **you** choose the categories. That
-  classification is yours, so they have to see it before it lands in their financial record.
-  Print the table (date, amount, category, note) and append once they are happy. Never invent
-  expenses.
-- **Append-only, Variable Ausgaben only.** Never write to Übersicht or Kategorien, and never edit
-  or delete existing rows (the skill can't, by design — the user does that in Sheets).
-- Use the **current year's** book: build `haushaltsbuch<year>` from the injected date and pick the
-  exact-name match from `find`.
-- If credentials are missing or lack the `spreadsheets` scope, the user runs `scripts/google-consent.mjs`.
+- **Always show proposed rows before appending.**
+- **Never write to anything except `Variable Ausgaben`.**
+- **Never invent unreadable amounts, dates, or product meanings.**
+- **Prefer decisive classification when evidence is strong.**
+- **Ask fewer questions, but ask the right one when needed.**
