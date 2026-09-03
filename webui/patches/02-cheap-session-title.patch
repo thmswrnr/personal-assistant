@@ -1,13 +1,13 @@
 diff --git a/lib/session-title.test.mjs b/lib/session-title.test.mjs
-index 1819faf..b28a9ca 100644
+index 1819faf..b03a19e 100644
 --- a/lib/session-title.test.mjs
 +++ b/lib/session-title.test.mjs
 @@ -8,6 +8,8 @@ const jiti = createJiti(import.meta.url);
  const {
    appendTitleRequestToTrailingUser,
    buildSessionTitleAgentOptions,
-+  findTitleContextMessage,
-+  trimToTitleContext,
++  buildTitleContextMessage,
++  renderTitleContext,
    generateSessionTitle,
    parseGeneratedSessionTitle,
    sanitizeTitleMessages,
@@ -54,7 +54,7 @@ index 1819faf..b28a9ca 100644
        model,
        thinkingLevel: "high",
        tools,
-@@ -180,26 +183,43 @@ test("temporary title agent preserves the provider-facing prefix", async () => {
+@@ -180,26 +183,88 @@ test("temporary title agent preserves the provider-facing prefix", async () => {
  
    const options = buildSessionTitleAgentOptions(source);
  
@@ -88,35 +88,92 @@ index 1819faf..b28a9ca 100644
 -  );
 +});
 +
-+test("title context keeps the opening text, drops images, and truncates", () => {
-+  const long = "x".repeat(5000);
-+  const trimmed = trimToTitleContext({
-+    role: "user",
-+    content: [
-+      { type: "text", text: long },
-+      { type: "image", data: "ignored", mimeType: "image/png" },
-+    ],
-+  });
-+  assert.equal(trimmed.content.length, 1);
-+  assert.equal(trimmed.content[0].type, "text");
-+  assert.equal(trimmed.content[0].text.length, 2000);
++function userTurn(text) {
++  return { role: "user", content: [{ type: "text", text }], timestamp: 1 };
++}
++
++test("renders every user turn, numbered, and excludes assistant replies", () => {
++  const rendered = renderTitleContext([
++    userTurn("add salad to the shopping list"),
++    assistantMessage("Done — a long reply that must not appear"),
++    userTurn("any new mail?"),
++    assistantMessage("Another long reply"),
++    userTurn("what do you know about me"),
++  ]);
++  assert.equal(rendered, [
++    "1. add salad to the shopping list",
++    "2. any new mail?",
++    "3. what do you know about me",
++  ].join("\n"));
++  assert.doesNotMatch(rendered, /long reply/);
 +});
 +
-+test("title context is the first user message, not the last", () => {
-+  const opening = findTitleContextMessage([
-+    { role: "user", content: [{ type: "text", text: "first ask" }] },
-+    { role: "assistant", content: [{ type: "text", text: "reply" }] },
-+    { role: "user", content: [{ type: "text", text: "second ask" }] },
++test("a compaction summary counts as a turn", () => {
++  const rendered = renderTitleContext([
++    {
++      role: "compactionSummary",
++      summary: "The user asked to fix title generation.",
++      tokensBefore: 100_000,
++      timestamp: 1,
++    },
++    userTurn("carry on"),
 +  ]);
-+  assert.equal(opening.content[0].text, "first ask");
++  assert.match(rendered, /^1\. The user asked to fix title generation\./);
++  assert.match(rendered, /2\. carry on/);
++});
++
++test("each turn is trimmed, so one rambling message cannot crowd out the rest", () => {
++  const rendered = renderTitleContext([userTurn("x".repeat(5000)), userTurn("second")]);
++  const [first] = rendered.split("\n");
++  assert.equal(first.length, "1. ".length + 400);
++  assert.match(rendered, /2\. second/);
++});
++
++test("a session within budget keeps every turn — the normal case", () => {
++  // The shape of the real benchmark session: 14 turns, 542 characters.
++  const turns = Array.from({ length: 14 }, (_, i) => userTurn(`turn ${i + 1} about something`));
++  const rendered = renderTitleContext(turns);
++  assert.match(rendered, /^1\. turn 1 /);
++  assert.match(rendered, /14\. turn 14 /);
++  assert.doesNotMatch(rendered, /omitted/);
++});
++
++test("over budget, the middle is dropped and the gap is stated", () => {
++  const turns = Array.from({ length: 40 }, (_, i) => userTurn(`${i + 1} ${"y".repeat(300)}`));
++  const rendered = renderTitleContext(turns);
++
++  // First three and last two survive, and the numbering shows where the gap is.
++  assert.match(rendered, /^1\. 1 y+/);
++  assert.match(rendered, /\n3\. 3 y+/);
++  assert.match(rendered, /\(35 messages omitted\)/);
++  assert.match(rendered, /\n39\. 39 y+/);
++  assert.match(rendered, /\n40\. 40 y+/);
++  assert.doesNotMatch(rendered, /\n20\. /);
++});
++
++test("a session with no user turns produces no context message", () => {
++  assert.equal(buildTitleContextMessage([assistantMessage("only a reply")]), undefined);
++  assert.equal(renderTitleContext([]), "");
  });
  
  test("keeps only tool calls with adjacent matching results", () => {
+@@ -280,5 +345,10 @@ test("removes incomplete tool calls before invoking the title provider", async (
+ 
+   assert.equal(result.title, "Sanitized Tool Call History");
+   assert.deepEqual(providerMessages.map((message) => message.role), ["user"]);
+-  assert.match(providerMessages[0].content, /Create a concise title/);
++  // One synthesised user turn: the rendered context, then the request appended to it.
++  const text = providerMessages[0].content.map((block) => block.text).join("\n");
++  assert.match(text, /1\. run a command/);
++  assert.match(text, /Create a concise title/);
++  // The orphaned tool call never reaches the provider.
++  assert.doesNotMatch(text, /sleep 10/);
+ });
 diff --git a/lib/session-title.ts b/lib/session-title.ts
-index 13f214e..970a2f6 100644
+index 13f214e..c85c874 100644
 --- a/lib/session-title.ts
 +++ b/lib/session-title.ts
-@@ -2,12 +2,18 @@ import {
+@@ -2,20 +2,33 @@ import {
    Agent,
    type AgentMessage,
    type AgentOptions,
@@ -126,17 +183,36 @@ index 13f214e..970a2f6 100644
  
  const TITLE_TIMEOUT_MS = 90_000;
  const MAX_TITLE_LENGTH = 80;
-+// How much of the opening message the namer gets to see. A title is a summary of
-+// the ask, so the first couple of thousand characters carry it.
-+const MAX_TITLE_CONTEXT_CHARS = 2_000;
-+
++// Budget for what the namer sees. These only bite on a session far larger than any
++// real one so far — the benchmark session's 14 turns come to 542 characters — but
++// when they do, turns are genuinely missing and the rendering has to say so.
++const MAX_TITLE_TURN_CHARS = 400;
++const MAX_TITLE_CONTEXT_CHARS = 2_500;
++const TITLE_HEAD_TURNS = 3;
++const TITLE_TAIL_TURNS = 2;
+ 
+-const TITLE_PROMPT = `Create a concise title for this session based on the conversation above.
++// Deliberately not "every message": the budget above can drop the middle, so a
++// promise of completeness would be false exactly when it matters.
 +const TITLE_SYSTEM_PROMPT =
-+  "You name chat sessions. You are shown the message that opened a session and you "
-+  + "reply with a title for it. You have no tools and no other task.";
++  "You name chat sessions. You are shown the messages a user sent in one session, "
++  + "oldest first. You reply with a short title naming what the session is mostly about.";
++
++const TITLE_PROMPT = `Create a concise title for the session described by the messages above.
  
- const TITLE_PROMPT = `Create a concise title for this session based on the conversation above.
+ Requirements:
+-- Match the primary language used by the user.
+-- Describe the user's concrete goal or the outcome, not the act of chatting.
++- Match the primary language the user writes in.
++- Name the concrete subject or goal, not the act of chatting.
++- Cover what the session is mostly about. Ignore filler turns such as "yes", "try again", or
++  "go on", and do not let a single aside become the title.
+ - Use 4-12 words for space-separated languages, or 8-24 characters for CJK text when practical.
+-- Do not call any tools.
+ - Return only the title as plain text, with no quotes, label, markdown, or explanation.`;
  
-@@ -29,29 +35,71 @@ export interface GeneratedSessionTitle {
+ export interface GeneratedSessionTitle {
+@@ -29,29 +42,107 @@ export interface GeneratedSessionTitle {
    };
  }
  
@@ -152,43 +228,79 @@ index 13f214e..970a2f6 100644
 + * dropped and long text is cut: naming a session needs the gist of how it
 + * opened, not the whole thing.
 + */
-+export function trimToTitleContext(message: AgentMessage): AgentMessage {
-+  // A compaction summary carries `summary`, not `content`. It is still the best
-+  // description of what the session is about, so it becomes the user turn.
++/** The user's own words from one turn, flattened and trimmed. */
++function turnText(message: AgentMessage): string {
++  // A compaction summary carries `summary`, not `content` — it stands in for the
++  // turns it replaced, so it counts as one.
 +  if (message.role === "compactionSummary") {
-+    return {
-+      role: "user",
-+      content: [{ type: "text", text: message.summary.slice(0, MAX_TITLE_CONTEXT_CHARS) }],
-+      timestamp: message.timestamp,
-+    };
++    return message.summary.slice(0, MAX_TITLE_TURN_CHARS).trim();
 +  }
-+  // AgentMessage is a union, and several of its members (bash execution, branch
-+  // summaries, custom messages) carry no content at all. Only a user turn is
-+  // narrowed here; findTitleContextMessage never hands us anything else.
-+  if (message.role !== "user") return message;
++  // AgentMessage is a union, and several members (bash execution, branch summaries,
++  // custom messages) carry no content at all. Only a user turn is narrowed here.
++  if (message.role !== "user") return "";
 +  if (typeof message.content === "string") {
-+    return { ...message, content: message.content.slice(0, MAX_TITLE_CONTEXT_CHARS) };
++    return message.content.slice(0, MAX_TITLE_TURN_CHARS).trim();
 +  }
-+  const text = message.content
++  return message.content
 +    .filter((block) => block.type === "text")
 +    .map((block) => block.text)
 +    .join("\n")
-+    .slice(0, MAX_TITLE_CONTEXT_CHARS);
-+  return { ...message, content: [{ type: "text", text }] };
-+}
-+
-+/** The message that established what the session is about. */
-+export function findTitleContextMessage(messages: AgentMessage[]): AgentMessage | undefined {
-+  const opening = messages.find(
-+    (message) => message.role === "user" || message.role === "compactionSummary",
-+  );
-+  return opening ? trimToTitleContext(opening) : undefined;
++    .slice(0, MAX_TITLE_TURN_CHARS)
++    .trim();
  }
  
  /**
 - * Build a temporary Agent configuration whose provider-facing prefix matches
 - * the source Agent. Tool implementations are replaced without changing their
 - * names, descriptions, or schemas, so a naming run cannot mutate the project.
++ * Render the user's side of a session as one numbered list, oldest first.
++ *
++ * Only the user's turns. The assistant's replies are what make a transcript huge,
++ * and they restate the question rather than adding to it — a real session here was
++ * 14 user turns totalling 542 characters against a transcript of some 18k tokens.
++ *
++ * Over budget, the middle is dropped rather than the tail, and the gap is stated.
++ * The numbering is what makes that visible: unbroken numbers mean nothing was
++ * removed, so the model can tell a complete session from a clipped one without
++ * being told which it is looking at.
++ */
++export function renderTitleContext(messages: AgentMessage[]): string {
++  const turns = messages
++    .map((message, index) => ({ index, text: turnText(message) }))
++    .filter((turn) => turn.text.length > 0);
++  if (turns.length === 0) return "";
++
++  // Number by position among the user's turns, not by index in the raw message
++  // list — "message 47" would be meaningless when the model only sees the user's.
++  const numbered = turns.map((turn, position) => ({ n: position + 1, text: turn.text }));
++  const total = numbered.reduce((sum, turn) => sum + turn.text.length, 0);
++  if (total <= MAX_TITLE_CONTEXT_CHARS || numbered.length <= TITLE_HEAD_TURNS + TITLE_TAIL_TURNS) {
++    return numbered.map((turn) => `${turn.n}. ${turn.text}`).join("\n");
++  }
++
++  const head = numbered.slice(0, TITLE_HEAD_TURNS);
++  const tail = numbered.slice(-TITLE_TAIL_TURNS);
++  // Singular is unreachable with the current constants — one omission needs exactly
++  // six turns, whose trimmed total (6 x 400) cannot exceed the 2500 cap. Handled so
++  // that tuning either constant does not quietly produce "1 messages omitted".
++  const omitted = numbered.length - head.length - tail.length;
++  return [
++    ...head.map((turn) => `${turn.n}. ${turn.text}`),
++    "",
++    `(${omitted} message${omitted === 1 ? "" : "s"} omitted)`,
++    "",
++    ...tail.map((turn) => `${turn.n}. ${turn.text}`),
++  ].join("\n");
++}
++
++/** The user's side of the session, as the single user turn the namer is given. */
++export function buildTitleContextMessage(messages: AgentMessage[]): AgentMessage | undefined {
++  const rendered = renderTitleContext(messages);
++  if (!rendered) return undefined;
++  return { role: "user", content: [{ type: "text", text: rendered }], timestamp: Date.now() };
++}
++
++/**
 + * Build a temporary Agent configuration for naming a session.
 + *
 + * Upstream cloned the source Agent's whole provider-facing prefix — system
@@ -221,19 +333,19 @@ index 13f214e..970a2f6 100644
      },
      convertToLlm: source.convertToLlm,
      transformContext: source.transformContext,
-@@ -212,20 +260,21 @@ export async function generateSessionTitle(source: AgentSession): Promise<Genera
+@@ -212,25 +303,25 @@ export async function generateSessionTitle(source: AgentSession): Promise<Genera
    const sourceAgent = source.agent;
    await sourceAgent.waitForIdle();
  
 +  // Sanitize first: an orphaned tool call would be rejected by the provider even
-+  // though we only keep one message out of the result.
++  // though only the user's turns survive into the rendering below.
    const sanitizedMessages = sanitizeTitleMessages(sourceAgent.state.messages);
 -  const historyLength = sanitizedMessages.length;
 -  if (!sanitizedMessages.some(
 -    (message) => message.role === "user" || message.role === "compactionSummary",
 -  )) {
-+  const opening = findTitleContextMessage(sanitizedMessages);
-+  if (!opening) {
++  const context = buildTitleContextMessage(sanitizedMessages);
++  if (!context) {
      throw new Error("The session has no user messages to name");
    }
  
@@ -243,12 +355,19 @@ index 13f214e..970a2f6 100644
 -  if (continuesFromTrailingUser) {
 -    options.initialState!.messages = appendTitleRequestToTrailingUser(sanitizedMessages);
 -  }
-+  // Fold the request into the opening message where we can, so the provider does
-+  // not receive two user messages in a row.
-+  const titleMessages = appendTitleRequestToTrailingUser([opening]);
-+  const continuesFromTrailingUser = opening.role === "user";
++  // Everything is folded into one user turn, so the provider never sees two user
++  // messages in a row and the request rides along with the context it refers to.
++  const titleMessages = appendTitleRequestToTrailingUser([context]);
 +  options.initialState!.messages = titleMessages;
 +  const historyLength = titleMessages.length;
  
    const temporaryAgent = new Agent(options);
-   const runPromise = continuesFromTrailingUser
+-  const runPromise = continuesFromTrailingUser
+-    ? temporaryAgent.continue()
+-    : temporaryAgent.prompt(TITLE_PROMPT);
++  // Always a continue(): the context is synthesised as a user turn, so the request
++  // has already been appended to it.
++  const runPromise = temporaryAgent.continue();
+   let timeout: ReturnType<typeof setTimeout> | undefined;
+ 
+   try {

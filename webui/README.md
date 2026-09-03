@@ -19,10 +19,20 @@ existing one, because that would take the gallery away and both are wanted.
 
 **`02-cheap-session-title.patch`** — naming a chat used to re-send the source agent's entire
 provider prefix: Core's `SYSTEM.md`, its long-term memory index, its skill catalogue, every
-tool's name/description/JSON schema, and the full message history — to produce four words.
-Upstream does this deliberately so a provider's prompt cache is reused, which pays on an API
-that bills and caches input tokens. Ours does neither, so it was pure waste. The naming run now
-gets a short purpose-built system prompt, no tools, and the opening message alone.
+tool's name/description/JSON schema, and the full message history — measured at 18,391 input
+tokens to produce 18 output tokens. Upstream does this deliberately so a provider's prompt cache
+is reused, which pays on an API that bills and caches input tokens. Ours does neither.
+
+The naming run now gets a short purpose-built system prompt, no tools, and the user's turns
+rendered as one numbered list, oldest first. Only the user's turns: the assistant's replies are
+what make a transcript huge, and they restate the question rather than adding to it — a real
+session here was 14 user turns totalling 542 characters against roughly 18k tokens of
+transcript.
+
+Long sessions are budgeted (400 characters a turn, 2,500 overall, then first three and last two
+with the gap stated). The numbering is what makes a gap visible: unbroken numbers mean nothing
+was dropped. For the same reason the system prompt says "the messages a user sent" and not
+"every message" — a promise of completeness would be false exactly when the budget bites.
 
 ## Rebuilding
 
