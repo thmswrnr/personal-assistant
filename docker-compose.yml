@@ -103,9 +103,9 @@ services:
       - core_network
 
   core_webui:
-    # TRIAL BRANCH: @agegr/pi-web. A browser chat window for Core — a session sidebar you can
-    # resume from the phone, a streaming thinking output, and a file explorer for the things
-    # Core downloads and writes. Judge it against the criteria in the plan, then keep or drop.
+    # @agegr/pi-web, patched (see ../webui/). A browser chat window for Core — a session sidebar
+    # you can resume from the phone, a streaming thinking output, and a file explorer for the
+    # things Core downloads and writes. Starts by default, like core and core_bridge.
     #
     # Same image as core and core_bridge. That is the point: this UI runs the agent IN-PROCESS,
     # so it needs the same git/jq/gh/yt-dlp that Core's skills shell out to, plus the same
@@ -115,7 +115,6 @@ services:
       dockerfile: Dockerfile
     image: core-harness
     container_name: core_webui
-    profiles: ["webui"]
     user: "node"
     volumes:
       - ./data/pi:/app/.pi:rw

@@ -10,8 +10,9 @@ metadata:
 Classify common receipt items correctly **without unnecessary questions**, while still asking
 when a line is genuinely ambiguous.
 
-The user keeps a yearly budget spreadsheet **`haushaltsbuch<year>`** (e.g. `haushaltsbuch2026`)
-with three tabs. You only ever **append rows to `Variable Ausgaben`** — everything else is read-only.
+The user keeps a yearly budget spreadsheet in **Google Sheets**, named **`haushaltsbuch<year>`**
+(e.g. `haushaltsbuch2026`), with three tabs. You only ever **append rows to `Variable Ausgaben`**
+— everything else is read-only.
 
 - **Variable Ausgaben** — the line-item list. The only tab you write to.
 - **Kategorien** — the canonical categories: column A is the name, column B describes what belongs in it.

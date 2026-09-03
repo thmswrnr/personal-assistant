@@ -42,8 +42,7 @@ and carry the tarball over:
 ```bash
 ./webui/build.sh                                        # -> core/vendor/pi-web.tgz
 scp core/vendor/pi-web.tgz rpi@rpi:personal-assistant/core/vendor/
-ssh rpi@rpi 'cd personal-assistant && docker compose build core \
-  && docker compose --profile home --profile webui up -d'
+ssh rpi@rpi 'cd personal-assistant && docker compose build core && docker compose up -d'
 ```
 
 `build.sh` clones the pin in `upstream.txt`, applies every patch, then runs `npm ci`, `npm test`
